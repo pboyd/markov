@@ -1,5 +1,7 @@
 package markov
 
+import "math/rand"
+
 type Node struct {
 	Value    interface{}
 	children []*childNode
@@ -57,4 +59,18 @@ func (n *Node) Probabilities() map[interface{}]float64 {
 	}
 
 	return p
+}
+
+func (n *Node) Next() *Node {
+	index := rand.Intn(n.sum())
+	passed := 0
+
+	for _, child := range n.children {
+		passed += child.Count
+		if passed > index {
+			return child.Node
+		}
+	}
+
+	panic("Next() failed")
 }
