@@ -1,13 +1,14 @@
 package disk
 
 import (
+	"encoding/binary"
 	"io"
-	"sync"
 )
+
+const addressLength = 8
 
 // File reads and writes data from a file (or, at least, a io.ReadWriteSeeker).
 type File struct {
-	mu sync.Mutex
 	rw io.ReadWriteSeeker
 }
 
@@ -24,12 +25,6 @@ func (f *File) Append(buf []byte) (int64, error) {
 // A negative offset starts from the end of the file. -1 is the very end, -2 is
 // the byte before and so forth.
 func (f *File) Write(offset int64, buf []byte) (int64, error) {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	return f.writeLock(offset, buf)
-}
-
-func (f *File) writeLock(offset int64, buf []byte) (int64, error) {
 	var newOff int64
 	var err error
 
@@ -47,9 +42,6 @@ func (f *File) writeLock(offset int64, buf []byte) (int64, error) {
 }
 
 func (f *File) Read(offset, length int64) ([]byte, error) {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-
 	_, err := f.rw.Seek(offset, io.SeekStart)
 	if err != nil {
 		return nil, err
@@ -59,4 +51,19 @@ func (f *File) Read(offset, length int64) ([]byte, error) {
 	n, err := io.ReadFull(f.rw, buf)
 
 	return buf[:n], err
+}
+
+func (f *File) writeAddress(offset, address int64) (int64, error) {
+	buf := make([]byte, addressLength)
+	binary.BigEndian.PutUint64(buf, uint64(address))
+	return f.Write(offset, buf)
+}
+
+func (f *File) readAddress(offset int64) (int64, error) {
+	buf, err := f.Read(offset, addressLength)
+	if err != nil {
+		return 0, err
+	}
+
+	return int64(binary.BigEndian.Uint64(buf)), nil
 }

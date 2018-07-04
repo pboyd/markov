@@ -19,15 +19,12 @@ func (f *File) WriteBlob(offset int64, buf []byte) (int64, error) {
 	size := make([]byte, blobSizeLength)
 	binary.BigEndian.PutUint16(size, uint16(len(buf)))
 
-	f.mu.Lock()
-	defer f.mu.Unlock()
-
-	startOffset, err := f.writeLock(offset, size)
+	startOffset, err := f.Write(offset, size)
 	if err != nil {
 		return 0, err
 	}
 
-	_, err = f.writeLock(startOffset+int64(len(size)), buf)
+	_, err = f.Write(startOffset+int64(len(size)), buf)
 	return startOffset, err
 }
 
