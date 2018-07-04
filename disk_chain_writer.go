@@ -17,9 +17,8 @@ const (
 )
 
 type DiskChainWriter struct {
-	file *disk.File
-
-	indexCreated bool
+	file  *disk.File
+	index map[interface{}]int64
 }
 
 func NewDiskChainWriter(w io.ReadWriteSeeker) (*DiskChainWriter, error) {
@@ -31,7 +30,8 @@ func NewDiskChainWriter(w io.ReadWriteSeeker) (*DiskChainWriter, error) {
 	file := disk.NewFile(w)
 
 	return &DiskChainWriter{
-		file: file,
+		file:  file,
+		index: make(map[interface{}]int64),
 	}, nil
 }
 
@@ -84,40 +84,22 @@ func (c *DiskChainWriter) Links(id int) ([]Link, error) {
 }
 
 func (c *DiskChainWriter) Find(value interface{}) (int, error) {
-	valueBuf, err := MarshalValue(value)
-	if err != nil {
-		return 0, err
-	}
-
-	root, err := disk.ReadBinaryTree(c.file, indexOffset)
-	if err != nil {
-		return 0, err
-	}
-
-	node, err := root.Search(valueBuf)
-	if err != nil {
-		return 0, err
-	}
-
-	if node == nil {
+	id, ok := c.index[value]
+	if !ok {
 		return 0, ErrNotFound
 	}
 
-	return int(node.Value()), nil
+	return int(id), nil
 }
 
 func (c *DiskChainWriter) Add(value interface{}) (int, error) {
-	valueBuf, err := MarshalValue(value)
-	if err != nil {
-		return 0, err
+	existing, err := c.Find(value)
+	if err == nil {
+		return existing, nil
 	}
 
-	indexNode, err := c.createIndexEntry(valueBuf)
+	valueBuf, err := MarshalValue(value)
 	if err != nil {
-		if err == disk.ErrDuplicate {
-			return int(indexNode.Value()), nil
-		}
-
 		return 0, err
 	}
 
@@ -126,11 +108,7 @@ func (c *DiskChainWriter) Add(value interface{}) (int, error) {
 		return 0, err
 	}
 
-	indexNode.SetValue(id)
-	err = indexNode.Write()
-	if err != nil {
-		return 0, err
-	}
+	c.index[value] = id
 
 	_, err = disk.NewList(c.file, c.packLinkValue(-1, 0))
 
@@ -200,24 +178,4 @@ func (c *DiskChainWriter) packLinkValue(id int, count uint32) []byte {
 	binary.BigEndian.PutUint64(buf, uint64(id))
 	binary.BigEndian.PutUint32(buf[8:], uint32(count))
 	return buf
-}
-
-func (c *DiskChainWriter) createIndexEntry(key []byte) (*disk.BinaryTreeNode, error) {
-	if !c.indexCreated {
-		root := disk.NewBinaryTree(c.file)
-		c.indexCreated = true
-		root, err := root.Insert(key, 0)
-
-		if root.Offset != indexOffset {
-			panic("index at wrong location")
-		}
-
-		return root, err
-	}
-
-	bst, err := disk.ReadBinaryTree(c.file, indexOffset)
-	if err != nil {
-		return nil, err
-	}
-	return bst.Insert(key, 0)
 }
