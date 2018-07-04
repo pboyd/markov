@@ -14,7 +14,7 @@ func IterativeWalker(chain Chain) Walker {
 	}
 }
 
-func (w *iterativeWalker) Next() (Value, error) {
+func (w *iterativeWalker) Next() (interface{}, error) {
 	if w.ids == nil {
 		var err error
 		w.ids, err = w.allIDs()

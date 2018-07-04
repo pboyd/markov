@@ -14,7 +14,7 @@ func NewDiskChainWriter(w io.WriteSeeker) *DiskChainWriter {
 	}
 }
 
-func (c *DiskChainWriter) Add(Value) (id int, err error) {
+func (c *DiskChainWriter) Add(interface{}) (id int, err error) {
 	return 0, nil
 }
 

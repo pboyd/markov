@@ -16,7 +16,7 @@ func RandomWalker(chain Chain, startID int) Walker {
 	}
 }
 
-func (w *randomWalker) Next() (Value, error) {
+func (w *randomWalker) Next() (interface{}, error) {
 	links, err := w.chain.Links(w.last)
 	if err != nil {
 		return 0, err

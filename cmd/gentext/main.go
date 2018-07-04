@@ -58,7 +58,7 @@ func main() {
 	fmt.Print("\n")
 }
 
-func readFile(path string) (<-chan markov.Value, error) {
+func readFile(path string) (<-chan interface{}, error) {
 	fh, err := os.Open(path)
 	if err != nil {
 		return nil, err
@@ -66,7 +66,7 @@ func readFile(path string) (<-chan markov.Value, error) {
 
 	reader := bufio.NewReader(fh)
 
-	words := make(chan markov.Value)
+	words := make(chan interface{})
 
 	go func() {
 		defer func() {

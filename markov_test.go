@@ -48,8 +48,8 @@ func testReadWriteChain(t *testing.T, chain ReadWriteChain) {
 	}
 }
 
-func split(text string) <-chan Value {
-	runes := make(chan Value)
+func split(text string) <-chan interface{} {
+	runes := make(chan interface{})
 
 	go func() {
 		defer close(runes)

@@ -14,7 +14,7 @@ func NewDiskChain(r io.ReadSeeker) *DiskChain {
 	}
 }
 
-func (c *DiskChain) Get(id int) (Value, error) {
+func (c *DiskChain) Get(id int) (interface{}, error) {
 	return nil, ErrNotFound
 }
 
@@ -22,6 +22,6 @@ func (c *DiskChain) Links(id int) ([]Link, error) {
 	return nil, ErrNotFound
 }
 
-func (c *DiskChain) Find(Value) (id int, err error) {
+func (c *DiskChain) Find(interface{}) (id int, err error) {
 	return 0, ErrNotFound
 }

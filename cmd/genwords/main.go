@@ -84,7 +84,7 @@ func main() {
 	fmt.Print("\n")
 }
 
-func readFile(path string) (<-chan markov.Value, <-chan markov.Value, error) {
+func readFile(path string) (<-chan interface{}, <-chan interface{}, error) {
 	fh, err := os.Open(path)
 	if err != nil {
 		return nil, nil, err
@@ -92,8 +92,8 @@ func readFile(path string) (<-chan markov.Value, <-chan markov.Value, error) {
 
 	reader := bufio.NewReader(fh)
 
-	letters := make(chan markov.Value)
-	lengths := make(chan markov.Value)
+	letters := make(chan interface{})
+	lengths := make(chan interface{})
 
 	go func() {
 		letters <- ' '

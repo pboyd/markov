@@ -9,14 +9,14 @@ var (
 
 // Chain is a read-only Markov chain.
 type Chain interface {
-	Get(id int) (Value, error)
+	Get(id int) (interface{}, error)
 	Links(id int) ([]Link, error)
-	Find(Value) (id int, err error)
+	Find(interface{}) (id int, err error)
 }
 
 // WriteChain is a Markov chain that can only be written.
 type WriteChain interface {
-	Add(Value) (id int, err error)
+	Add(interface{}) (id int, err error)
 	Relate(parent, child int, delta int) error
 }
 
@@ -25,8 +25,6 @@ type ReadWriteChain interface {
 	Chain
 	WriteChain
 }
-
-type Value interface{}
 
 type Link struct {
 	ID          int

@@ -6,20 +6,20 @@ var _ Chain = &MemoryChain{}
 
 type MemoryChain struct {
 	mu         sync.RWMutex
-	valueIndex map[Value]int
-	values     []Value
+	valueIndex map[interface{}]int
+	values     []interface{}
 	links      []linkCountSlice
 }
 
 func NewMemoryChain(cap int) *MemoryChain {
 	return &MemoryChain{
-		valueIndex: make(map[Value]int, cap),
-		values:     make([]Value, 0, cap),
+		valueIndex: make(map[interface{}]int, cap),
+		values:     make([]interface{}, 0, cap),
 		links:      make([]linkCountSlice, 0, cap),
 	}
 }
 
-func (c *MemoryChain) Get(id int) (Value, error) {
+func (c *MemoryChain) Get(id int) (interface{}, error) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 
@@ -41,7 +41,7 @@ func (c *MemoryChain) Links(id int) ([]Link, error) {
 	return c.links[id].LinkSlice(), nil
 }
 
-func (c *MemoryChain) Find(value Value) (int, error) {
+func (c *MemoryChain) Find(value interface{}) (int, error) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 
@@ -54,7 +54,7 @@ func (c *MemoryChain) Find(value Value) (int, error) {
 	return id, nil
 }
 
-func (c *MemoryChain) Add(value Value) (int, error) {
+func (c *MemoryChain) Add(value interface{}) (int, error) {
 	existing, err := c.Find(value)
 	if err == nil {
 		return existing, nil
@@ -67,7 +67,7 @@ func (c *MemoryChain) Add(value Value) (int, error) {
 	c.links = append(c.links, make(linkCountSlice, 0, 1))
 
 	if c.valueIndex == nil {
-		c.valueIndex = map[Value]int{}
+		c.valueIndex = map[interface{}]int{}
 	}
 
 	id := len(c.values) - 1

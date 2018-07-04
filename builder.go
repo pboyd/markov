@@ -2,12 +2,12 @@ package markov
 
 import "sync"
 
-func Feed(wc WriteChain, chans ...<-chan Value) {
+func Feed(wc WriteChain, chans ...<-chan interface{}) {
 	var wg sync.WaitGroup
 	wg.Add(len(chans))
 
 	for _, ch := range chans {
-		go func(values <-chan Value) {
+		go func(values <-chan interface{}) {
 			defer wg.Done()
 			feedOne(wc, values)
 		}(ch)
@@ -16,7 +16,7 @@ func Feed(wc WriteChain, chans ...<-chan Value) {
 	wg.Wait()
 }
 
-func feedOne(wc WriteChain, values <-chan Value) {
+func feedOne(wc WriteChain, values <-chan interface{}) {
 	var next int
 	var err error
 

@@ -11,7 +11,7 @@ func TestRandomWalker(t *testing.T) {
 
 	const iterations = 100000
 
-	counts := map[Value]int{}
+	counts := map[interface{}]int{}
 
 	for i := 0; i < iterations; i++ {
 		walker := RandomWalker(chain, 0)

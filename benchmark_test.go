@@ -25,8 +25,8 @@ func BenchmarkRandomWalk(b *testing.B) {
 	}
 }
 
-func normalDistGenerator(count, stddev int) <-chan Value {
-	numbers := make(chan Value)
+func normalDistGenerator(count, stddev int) <-chan interface{} {
+	numbers := make(chan interface{})
 
 	go func() {
 		defer close(numbers)
