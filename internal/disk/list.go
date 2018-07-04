@@ -18,6 +18,10 @@ func newListItem(f *File, next int64, value []byte) (ListItem, error) {
 	return item, err
 }
 
+func ReadList(f *File, offset int64) *ListItem {
+	return &ListItem{f, offset}
+}
+
 func NewList(f *File, rootValue []byte) (ListItem, error) {
 	return newListItem(f, -1, rootValue)
 }
@@ -30,15 +34,19 @@ func (i ListItem) Value() ([]byte, error) {
 	return i.f.ReadBlob(i.Offset + addressLength)
 }
 
-func (i ListItem) Next() (ListItem, error) {
-	offset, err := i.f.readAddress(i.Offset)
+func (i ListItem) Next() (*ListItem, error) {
+	nextOffset, err := i.f.readAddress(i.Offset)
 	if err != nil {
-		return ListItem{}, err
+		return nil, err
 	}
 
-	return ListItem{
+	if nextOffset < 0 {
+		return nil, nil
+	}
+
+	return &ListItem{
 		f:      i.f,
-		Offset: offset,
+		Offset: nextOffset,
 	}, nil
 }
 
@@ -49,7 +57,12 @@ func (i ListItem) InsertAfter(value []byte) (ListItem, error) {
 		return ListItem{}, err
 	}
 
-	newNext, err := newListItem(i.f, oldNext.Offset, value)
+	var nextOffset int64 = -1
+	if oldNext != nil {
+		nextOffset = oldNext.Offset
+	}
+
+	newNext, err := newListItem(i.f, nextOffset, value)
 	if err != nil {
 		return newNext, err
 	}

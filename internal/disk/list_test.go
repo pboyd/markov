@@ -55,7 +55,7 @@ func TestList(t *testing.T) {
 		}
 
 		next, _ := root.Next()
-		if next != item {
+		if next == nil || *next != item {
 			t.Errorf("got item %d, want %d", next.Offset, item.Offset)
 		}
 	})

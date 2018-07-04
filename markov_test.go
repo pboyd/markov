@@ -30,6 +30,10 @@ func testReadWriteChain(t *testing.T, chain ReadWriteChain) {
 		t.Fatalf("got error: %v", err)
 	}
 
+	if len(links) == 0 {
+		t.Error("got 0 links, want > 0")
+	}
+
 	aID, err := chain.Find('a')
 	if err != nil {
 		t.Fatalf("got error: %v", err)
