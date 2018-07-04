@@ -35,29 +35,4 @@ func TestBlob(t *testing.T) {
 			}
 		}
 	})
-
-	t.Run("Overwrite", func(t *testing.T) {
-		const offset = 10
-
-		owbuf := make([]byte, 9)
-
-		err := OverwriteBlob(rw, offset, owbuf)
-		if err == nil {
-			t.Errorf("got nil error with wrong size buffer")
-		}
-
-		err = OverwriteBlob(rw, offset, owbuf[:8])
-		if err != nil {
-			t.Fatalf("got write error: %v", err)
-		}
-
-		rbuf, err := ReadBlob(rw, offset)
-		if err != nil {
-			t.Fatalf("got read error: %v", err)
-		}
-
-		if !bytes.Equal(rbuf, owbuf[:8]) {
-			t.Errorf("\ngot:  %v\nwant: %v", rbuf, owbuf)
-		}
-	})
 }

@@ -29,26 +29,6 @@ func WriteBlob(ws io.WriteSeeker, offset int64, buf []byte) (int64, error) {
 	return startOffset, err
 }
 
-// OverwriteBlob modifies an existing blob. The new buffer must be the same
-// size as the original.
-func OverwriteBlob(rws io.ReadWriteSeeker, offset int64, buf []byte) error {
-	if offset < 0 {
-		return errors.New("OverwriteBlob with negative offset")
-	}
-
-	size, err := ReadBlobSize(rws, offset)
-	if err != nil {
-		return err
-	}
-
-	if uint16(len(buf)) != size {
-		return errors.New("OverwriteBlob size mismatch")
-	}
-
-	_, err = rws.Write(buf)
-	return err
-}
-
 func ReadBlobSize(rs io.ReadSeeker, offset int64) (uint16, error) {
 	sizeBuf, err := Read(rs, offset, BlobHeaderLength)
 	if err != nil {
@@ -64,5 +44,5 @@ func ReadBlob(rs io.ReadSeeker, offset int64) ([]byte, error) {
 		return nil, err
 	}
 
-	return readNext(rs, int64(size))
+	return Read(rs, offset+2, int64(size))
 }

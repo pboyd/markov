@@ -3,46 +3,45 @@ package disk
 import (
 	"encoding/binary"
 	"errors"
-	"io"
+	"os"
 )
-
-const listHeaderSize = 4
 
 var ErrOutOfBounds = errors.New("list index out of bounds")
 
 type List struct {
-	file        io.ReadWriteSeeker
-	offset      int64
+	file        *os.File
 	elementSize uint16
 	bucketCap   uint16
 
-	tailBucket       *listBucket
-	tailBucketNumber uint16
+	headBucket *listBucket
 
 	readBucket       *listBucket
 	readBucketNumber uint16
+
+	tailBucket       *listBucket
+	tailBucketNumber uint16
 }
 
-func NewList(rws io.ReadWriteSeeker, elementSize, bucketCap uint16) (*List, error) {
+func NewList(f *os.File, elementSize uint16, buf []byte) (*List, error) {
 	l := &List{
-		file:        rws,
+		file:        f,
 		elementSize: elementSize,
-		bucketCap:   bucketCap,
-		offset:      -1,
+		bucketCap:   (uint16(len(buf)) - addressLength) / elementSize,
 	}
-	err := l.Flush()
+
+	l.headBucket = newListBucketFromBuf(-1, elementSize, buf)
+	l.readBucket = l.headBucket
+
+	err := l.loadTailBucket()
 	if err != nil {
 		return nil, err
 	}
-
-	l.tailBucket, err = newListBucket(l.file, elementSize, bucketCap)
-	if err != nil {
-		return nil, err
-	}
-
-	l.readBucket = l.tailBucket
 
 	return l, nil
+}
+
+func ListBucketSize(elementSize, cap uint16) int {
+	return int(elementSize*cap) + addressLength
 }
 
 func (l *List) Append(buf []byte) error {
@@ -52,8 +51,8 @@ func (l *List) Append(buf []byte) error {
 			return err
 		}
 
-		l.tailBucket.SetNext(newTail)
-		err = l.tailBucket.Flush()
+		l.tailBucket.SetNext(newTail.offset)
+		err = l.tailBucket.Flush(l.file)
 		if err != nil {
 			return err
 		}
@@ -83,6 +82,10 @@ func (l *List) Get(i uint16) ([]byte, error) {
 }
 
 func (l *List) loadReadBucket(number uint16) (*listBucket, error) {
+	if number == 0 {
+		return l.headBucket, nil
+	}
+
 	if l.tailBucket != nil && number == l.tailBucketNumber {
 		return l.tailBucket, nil
 	}
@@ -112,15 +115,18 @@ func (l *List) loadReadBucket(number uint16) (*listBucket, error) {
 }
 
 func (l *List) bucketOffset(number uint16) (int64, error) {
-	var offset int64 = l.offset + int64(listHeaderSize)
+	offset := l.headBucket.Next()
 	var err error
 
-	for i := uint16(0); i < number; i++ {
-		// FIXME: It shouldn't allocate a new buffer on every iteration
-		offset, err = readAddress(l.file, offset)
+	buf := make([]byte, addressLength)
+
+	for i := uint16(1); i < number; i++ {
+		_, err = l.file.ReadAt(buf, offset)
 		if err != nil {
 			return 0, err
 		}
+
+		offset = int64(binary.BigEndian.Uint64(buf))
 
 		// No more buckets
 		if offset == 0 {
@@ -132,27 +138,38 @@ func (l *List) bucketOffset(number uint16) (int64, error) {
 }
 
 func (l *List) loadTailBucket() error {
-	bucketOffset, number, err := l.findTailBucket()
+	secondOffset := l.headBucket.Next()
+	if secondOffset == 0 {
+		l.tailBucketNumber = 0
+		l.tailBucket = l.headBucket
+		return nil
+	}
+
+	bucketOffset, number, err := l.findTailBucket(secondOffset)
 	if err != nil {
 		return err
 	}
 
 	l.tailBucket, err = readListBucket(l.file, bucketOffset, l.elementSize, l.bucketCap)
-	l.tailBucketNumber = number
+	// The search starts at the second bucket, so add 1.
+	l.tailBucketNumber = number + 1
+
 	return err
 }
 
-func (l *List) findTailBucket() (int64, uint16, error) {
-	var offset int64 = l.offset + int64(listHeaderSize)
+func (l *List) findTailBucket(offset int64) (int64, uint16, error) {
 	var number uint16
+	var err error
+
+	buf := make([]byte, addressLength)
 
 	for {
-		// FIXME: It shouldn't allocate a new buffer on every iteration
-		next, err := readAddress(l.file, offset)
+		_, err = l.file.ReadAt(buf, offset)
 		if err != nil {
 			return 0, 0, err
 		}
 
+		next := int64(binary.BigEndian.Uint64(buf))
 		if next == 0 {
 			break
 		}
@@ -162,32 +179,6 @@ func (l *List) findTailBucket() (int64, uint16, error) {
 	}
 
 	return offset, number, nil
-}
-
-func ReadList(rws io.ReadWriteSeeker, offset int64) (*List, error) {
-	buf, err := Read(rws, offset, listHeaderSize)
-	if err != nil {
-		return nil, err
-	}
-
-	l := &List{
-		file:        rws,
-		elementSize: binary.BigEndian.Uint16(buf),
-		bucketCap:   binary.BigEndian.Uint16(buf[2:]),
-		offset:      offset,
-	}
-
-	l.readBucket, err = readListBucket(l.file, offset+listHeaderSize, l.elementSize, l.bucketCap)
-	if err != nil {
-		return nil, err
-	}
-
-	err = l.loadTailBucket()
-	if err != nil {
-		return nil, err
-	}
-
-	return l, nil
 }
 
 func (l *List) ElementSize() uint16 {
@@ -201,50 +192,47 @@ func (l *List) Len() int {
 	return length
 }
 
-func (l *List) Offset() int64 {
-	return l.offset
-}
-
 func (l *List) Flush() error {
-	offset, err := Write(l.file, l.offset, l.header())
-	if err != nil {
-		return err
+	// Never write the head bucket
+	if l.tailBucketNumber == 0 {
+		return nil
 	}
 
-	l.offset = offset
-	return l.tailBucket.Flush()
+	return l.tailBucket.Flush(l.file)
 }
 
-func (l *List) header() []byte {
-	buf := make([]byte, listHeaderSize)
-	binary.BigEndian.PutUint16(buf, l.elementSize)
-	binary.BigEndian.PutUint16(buf[2:], l.bucketCap)
-	return buf
-}
-
+// listBucket contains a subset of the list's elements. The list can contain
+// any number of buckets. The offset of the next address is stored in the first
+// 8 bytes of the bucket.
 type listBucket struct {
-	file        io.ReadWriteSeeker
 	offset      int64
-	dirty       bool
 	buf         []byte
 	elementSize uint16
 	Count       uint16
 }
 
-func newListBucket(rws io.ReadWriteSeeker, elementSize, cap uint16) (*listBucket, error) {
+func newListBucket(f *os.File, elementSize, cap uint16) (*listBucket, error) {
 	b := &listBucket{
-		file:        rws,
 		offset:      -1,
 		elementSize: elementSize,
-		buf:         make([]byte, elementSize*cap+addressLength),
-		dirty:       true,
+		buf:         make([]byte, ListBucketSize(elementSize, cap)),
 	}
-	return b, b.Flush()
+	return b, b.Flush(f)
 }
 
-func readListBucket(rws io.ReadWriteSeeker, offset int64, elementSize, cap uint16) (*listBucket, error) {
+func newListBucketFromBuf(offset int64, elementSize uint16, buf []byte) *listBucket {
 	b := &listBucket{
-		file:        rws,
+		offset:      offset,
+		elementSize: elementSize,
+		buf:         buf,
+	}
+	b.Count = b.countElements()
+
+	return b
+}
+
+func readListBucket(f *os.File, offset int64, elementSize, cap uint16) (*listBucket, error) {
+	b := &listBucket{
 		offset:      offset,
 		elementSize: elementSize,
 	}
@@ -252,7 +240,7 @@ func readListBucket(rws io.ReadWriteSeeker, offset int64, elementSize, cap uint1
 	size := elementSize*cap + addressLength
 
 	var err error
-	b.buf, err = Read(b.file, offset, int64(size))
+	b.buf, err = Read(f, offset, int64(size))
 	if err != nil {
 		return nil, err
 	}
@@ -291,7 +279,6 @@ func isNull(buf []byte) bool {
 }
 
 func (b *listBucket) Append(buf []byte) {
-	b.dirty = true
 	copy(b.buf[b.indexOffset(b.Count):], buf[:b.elementSize])
 	b.Count++
 }
@@ -301,16 +288,16 @@ func (b *listBucket) Get(i uint16) []byte {
 	return b.buf[o : o+b.elementSize]
 }
 
-func (b *listBucket) SetNext(next *listBucket) {
-	binary.BigEndian.PutUint64(b.buf, uint64(next.offset))
+func (b *listBucket) Next() int64 {
+	return int64(binary.BigEndian.Uint64(b.buf))
 }
 
-func (b *listBucket) Flush() error {
-	if b == nil || !b.dirty {
-		return nil
-	}
+func (b *listBucket) SetNext(offset int64) {
+	binary.BigEndian.PutUint64(b.buf, uint64(offset))
+}
 
-	offset, err := Write(b.file, b.offset, b.buf)
+func (b *listBucket) Flush(f *os.File) error {
+	offset, err := Write(f, b.offset, b.buf)
 	if err != nil {
 		return err
 	}

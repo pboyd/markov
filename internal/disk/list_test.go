@@ -9,7 +9,18 @@ func TestList(t *testing.T) {
 	rw, cleanup := tempFile(t)
 	defer cleanup()
 
-	l, err := NewList(rw, 8, 16)
+	const (
+		elementSize = 8
+		bucketCap   = 16
+	)
+
+	// FIXME? 0 is used for null, so make sure the second bucket is at
+	// offset 1.
+	rw.Write([]byte{'x'})
+
+	head := make([]byte, ListBucketSize(elementSize, bucketCap))
+
+	l, err := NewList(rw, elementSize, head)
 	if err != nil {
 		t.Fatalf("NewList failed: %v", err)
 	}
@@ -63,7 +74,7 @@ func TestList(t *testing.T) {
 	})
 
 	t.Run("Read", func(t *testing.T) {
-		l2, err := ReadList(rw, l.offset)
+		l2, err := NewList(rw, elementSize, head)
 		if err != nil {
 			t.Fatalf("ReadList failed: %v", err)
 		}
@@ -82,7 +93,7 @@ func TestList(t *testing.T) {
 		for i := uint16(0); i < length; i++ {
 			buf, err := l2.Get(i)
 			if err != nil {
-				t.Fatalf("Get failed: %v", err)
+				t.Fatalf("%d: Get failed: %v", i, err)
 			}
 
 			actual := binary.BigEndian.Uint64(buf)
@@ -93,7 +104,7 @@ func TestList(t *testing.T) {
 	})
 
 	t.Run("Write after read", func(t *testing.T) {
-		l3, err := ReadList(rw, l.offset)
+		l3, err := NewList(rw, elementSize, head)
 		if err != nil {
 			t.Fatalf("ReadList failed: %v", err)
 		}

@@ -1,7 +1,6 @@
 package markov
 
 import (
-	"io"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -9,7 +8,7 @@ import (
 	"time"
 )
 
-func tempFile(t testing.TB) (io.ReadWriteSeeker, func()) {
+func tempFile(t testing.TB) (*os.File, func()) {
 	path := filepath.Join(
 		os.TempDir(),
 		strconv.Itoa(int(time.Now().UnixNano())),

@@ -2,7 +2,7 @@ package markov
 
 import (
 	"encoding/binary"
-	"io"
+	"os"
 
 	"github.com/pboyd/markov/internal/disk"
 )
@@ -17,11 +17,11 @@ const (
 )
 
 type DiskChainWriter struct {
-	file  io.ReadWriteSeeker
+	file  *os.File
 	index map[interface{}]int64
 }
 
-func NewDiskChainWriter(w io.ReadWriteSeeker) (*DiskChainWriter, error) {
+func NewDiskChainWriter(w *os.File) (*DiskChainWriter, error) {
 	_, err := w.Write([]byte(diskHeader))
 	if err != nil {
 		return nil, err
@@ -34,12 +34,12 @@ func NewDiskChainWriter(w io.ReadWriteSeeker) (*DiskChainWriter, error) {
 }
 
 func (c *DiskChainWriter) Get(id int) (interface{}, error) {
-	valueBuf, err := disk.ReadBlob(c.file, int64(id))
+	record, err := disk.ReadRecord(c.file, int64(id), linkListItemSize)
 	if err != nil {
 		return nil, err
 	}
 
-	return unmarshalValue(valueBuf)
+	return unmarshalValue(record.Value())
 }
 
 func (c *DiskChainWriter) Links(id int) ([]Link, error) {
@@ -97,20 +97,18 @@ func (c *DiskChainWriter) Add(value interface{}) (int, error) {
 		return 0, err
 	}
 
-	id, err := disk.WriteBlob(c.file, -1, valueBuf)
+	record, err := disk.NewRecord(c.file, valueBuf, linkListItemSize, linkListItemsPerBucket)
 	if err != nil {
 		return 0, err
 	}
 
-	c.index[value] = id
+	c.index[value] = record.Offset
 
-	_, err = disk.NewList(c.file, linkListItemSize, linkListItemsPerBucket)
-
-	return int(id), err
+	return int(record.Offset), err
 }
 
 func (c *DiskChainWriter) Relate(parent, child int, delta int) error {
-	list, err := c.linkList(int64(parent))
+	record, err := disk.ReadRecord(c.file, int64(parent), linkListItemSize)
 	if err != nil {
 		return err
 	}
@@ -118,8 +116,8 @@ func (c *DiskChainWriter) Relate(parent, child int, delta int) error {
 	newChild := true
 
 	// Check for an existing entry
-	for i := 0; i < list.Len(); i++ {
-		value, err := list.Get(uint16(i))
+	for i := 0; i < record.List.Len(); i++ {
+		value, err := record.List.Get(uint16(i))
 		if err != nil {
 			return err
 		}
@@ -134,20 +132,19 @@ func (c *DiskChainWriter) Relate(parent, child int, delta int) error {
 	}
 
 	if newChild {
-		list.Append(c.packLinkValue(child, uint32(delta)))
+		record.List.Append(c.packLinkValue(child, uint32(delta)))
 	}
 
-	return list.Flush()
+	return record.Write()
 }
 
 func (c *DiskChainWriter) linkList(id int64) (*disk.List, error) {
-	skip, err := disk.ReadBlobSize(c.file, id)
+	record, err := disk.ReadRecord(c.file, id, linkListItemSize)
 	if err != nil {
 		return nil, err
 	}
 
-	linkOffset := id + disk.BlobHeaderLength + int64(skip)
-	return disk.ReadList(c.file, linkOffset)
+	return record.List, nil
 }
 
 func (c *DiskChainWriter) unpackLinkValue(value []byte) (id int, count uint32) {
