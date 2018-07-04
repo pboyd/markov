@@ -41,7 +41,7 @@ func TestList(t *testing.T) {
 		for i := uint16(0); i < uint16(inserts); i++ {
 			buf, err := l.Get(i)
 			if err != nil {
-				t.Fatalf("Get failed: %v", err)
+				t.Fatalf("Get %d failed: %v", i, err)
 			}
 
 			actual := binary.BigEndian.Uint64(buf)

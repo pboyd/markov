@@ -13,7 +13,7 @@ const (
 	diskHeader = "MKV\u0001"
 
 	linkListItemSize       = 12
-	linkListItemsPerBucket = 8
+	linkListItemsPerBucket = 64
 )
 
 type DiskChainWriter struct {

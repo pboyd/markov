@@ -98,6 +98,7 @@ func readFile(path string) (<-chan interface{}, error) {
 				word.WriteRune(r)
 			} else {
 				if word.Len() > 0 {
+					//fmt.Println(word.String())
 					words <- word.String()
 					word.Reset()
 				}

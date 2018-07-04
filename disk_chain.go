@@ -1,14 +1,15 @@
 package markov
 
-import "io"
+import "os"
 
 var _ Chain = &DiskChain{}
 
 type DiskChain struct {
-	r io.ReadSeeker
+	r     *os.File
+	index map[interface{}]int64
 }
 
-func NewDiskChain(r io.ReadSeeker) (*DiskChain, error) {
+func NewDiskChain(r *os.File) (*DiskChain, error) {
 	return &DiskChain{
 		r: r,
 	}, nil

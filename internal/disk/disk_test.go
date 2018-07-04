@@ -78,3 +78,29 @@ func TestReadAppendWrite(t *testing.T) {
 		t.Errorf("got %d, want %d", actual, val)
 	}
 }
+
+func TestSectionHeader(t *testing.T) {
+	cases := []struct {
+		t   sectionType
+		len uint32
+	}{
+		{0xe, 0xabcdef},
+		{recordSection, 123},
+		{0, 1<<24 - 1},
+	}
+
+	for _, c := range cases {
+		buf := make([]byte, 4)
+		putSectionHeader(buf, c.t, c.len)
+
+		typ, len := sectionHeader(buf)
+
+		if typ != c.t {
+			t.Errorf("got %d, want %d", typ, c.t)
+		}
+
+		if len != c.len {
+			t.Errorf("got %x, want %x", len, c.len)
+		}
+	}
+}

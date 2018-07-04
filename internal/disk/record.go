@@ -5,8 +5,6 @@ import (
 	"os"
 )
 
-const recordHeaderSize = 4
-
 type Record struct {
 	Offset int64
 	List   *List
@@ -15,11 +13,13 @@ type Record struct {
 }
 
 func NewRecord(file *os.File, value []byte, listElementSize uint16, listBucketLen uint16) (*Record, error) {
-	size := recordHeaderSize + len(value)
+	size := sectionHeaderLength + recordHeaderLength + len(value)
 	size += ListBucketSize(listElementSize, listBucketLen)
 
 	buf := make([]byte, size)
 	n := 0
+	putSectionHeader(buf[n:], recordSection, uint32(size-sectionHeaderLength))
+	n += 4
 	binary.BigEndian.PutUint16(buf[n:], uint16(len(value)))
 	n += 2
 	binary.BigEndian.PutUint16(buf[n:], listBucketLen)
@@ -52,24 +52,29 @@ func ReadRecord(file *os.File, offset int64, listElementSize uint16) (*Record, e
 		file:   file,
 	}
 
-	r.buf = make([]byte, recordHeaderSize)
+	r.buf = make([]byte, sectionHeaderLength+recordHeaderLength)
 	_, err := file.ReadAt(r.buf, offset)
 	if err != nil {
 		return nil, err
 	}
 
-	valueLen := r.valueLength()
-	size := int(valueLen) + ListBucketSize(listElementSize, r.listElements())
-	rest := make([]byte, size)
+	st, _ := sectionHeader(r.buf)
+	if st != recordSection {
+		return nil, sectionTypeError(st)
+	}
 
-	_, err = file.ReadAt(rest, offset+recordHeaderSize)
+	valueLen := r.valueLength()
+	restSize := int(valueLen) + ListBucketSize(listElementSize, r.listElements())
+	rest := make([]byte, restSize)
+
+	_, err = file.ReadAt(rest, offset+recordHeaderLength+sectionHeaderLength)
 	if err != nil {
 		return nil, err
 	}
 
 	r.buf = append(r.buf, rest...)
 
-	listOffset := recordHeaderSize + int64(valueLen)
+	listOffset := sectionHeaderLength + recordHeaderLength + int64(valueLen)
 	r.List, err = NewList(file, listElementSize, r.buf[listOffset:])
 	if err != nil {
 		return nil, err
@@ -94,15 +99,15 @@ func (r *Record) Write() error {
 }
 
 func (r *Record) valueLength() uint16 {
-	return binary.BigEndian.Uint16(r.buf)
+	return binary.BigEndian.Uint16(r.buf[4:])
 }
 
 func (r *Record) listElements() uint16 {
-	return binary.BigEndian.Uint16(r.buf[2:])
+	return binary.BigEndian.Uint16(r.buf[6:])
 }
 
 func (r *Record) Value() []byte {
-	start := recordHeaderSize
+	start := sectionHeaderLength + recordHeaderLength
 	end := start + int(r.valueLength())
 	return r.buf[start:end]
 }
