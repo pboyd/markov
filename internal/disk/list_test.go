@@ -1,7 +1,7 @@
 package disk
 
 import (
-	"bytes"
+	"encoding/binary"
 	"testing"
 )
 
@@ -11,52 +11,108 @@ func TestList(t *testing.T) {
 
 	f := NewFile(rw)
 
-	valueA := make([]byte, 8)
-	for i := range valueA {
-		valueA[i] = 0xff
-	}
-
-	valueB := make([]byte, 8)
-	for i := range valueB {
-		valueB[i] = byte(i)
-	}
-
-	root, err := NewList(f, valueA)
+	l, err := NewList(f, 8, 16)
 	if err != nil {
-		t.Fatalf("got error: %v", err)
+		t.Fatalf("NewList failed: %v", err)
 	}
 
-	t.Run("value", func(t *testing.T) {
-		actual, err := root.Value()
+	t.Run("Write", func(t *testing.T) {
+		inserts := 1024
+
+		buf := make([]byte, l.ElementSize())
+		for i := uint16(0); i < uint16(inserts); i++ {
+			binary.BigEndian.PutUint64(buf, uint64(i+1))
+			l.Append(buf)
+		}
+
+		if l.Len() != inserts {
+			t.Errorf("got len %d, want %d", l.Len(), inserts)
+		}
+
+		for i := uint16(0); i < uint16(inserts); i++ {
+			buf, err := l.Get(i)
+			if err != nil {
+				t.Fatalf("Get failed: %v", err)
+			}
+
+			actual := binary.BigEndian.Uint64(buf)
+			if actual != uint64(i+1) {
+				t.Errorf("%d: want %d, got %d", i, i+1, actual)
+			}
+		}
+
+		_, err = l.Get(1025)
+		if err != ErrOutOfBounds {
+			t.Errorf("got error %v, want %v", err, ErrOutOfBounds)
+		}
+
+		binary.BigEndian.PutUint64(buf, uint64(1025))
+		l.Append(buf)
+
+		if l.Len() != inserts+1 {
+			t.Errorf("got len %d, want %d", l.Len(), inserts+1)
+		}
+
+		_, err = l.Get(1026)
+		if err != ErrOutOfBounds {
+			t.Errorf("got error %v, want %v", err, ErrOutOfBounds)
+		}
+
+		err := l.Flush()
 		if err != nil {
-			t.Fatalf("got error: %v", err)
-		}
-
-		if !bytes.Equal(actual, valueA) {
-			t.Fatalf("\ngot:  %v\nwant: %v", actual, valueA)
-		}
-
-		root.SetValue(valueB)
-		actual, _ = root.Value()
-		if !bytes.Equal(actual, valueB) {
-			t.Errorf("\ngot:  %v\nwant: %v", actual, valueB)
+			t.Fatalf("Flush failed: %v", err)
 		}
 	})
 
-	t.Run("InsertAfter", func(t *testing.T) {
-		item, err := root.InsertAfter(valueA)
+	t.Run("Read", func(t *testing.T) {
+		l2, err := ReadList(f, l.offset)
 		if err != nil {
-			t.Fatalf("got error: %v", err)
+			t.Fatalf("ReadList failed: %v", err)
 		}
 
-		actual, _ := item.Value()
-		if !bytes.Equal(actual, valueA) {
-			t.Errorf("\ngot:  %v\nwant: %v", actual, valueA)
+		if l2.ElementSize() != l.ElementSize() {
+			t.Errorf("got size %d, want %d", l2.ElementSize(), l.ElementSize())
 		}
 
-		next, _ := root.Next()
-		if next == nil || *next != item {
-			t.Errorf("got item %d, want %d", next.Offset, item.Offset)
+		l2.Len()
+		if l2.Len() != l.Len() {
+			t.Errorf("got len %d, want %d", l2.Len(), l.Len())
+		}
+
+		length := uint16(l2.Len())
+
+		for i := uint16(0); i < length; i++ {
+			buf, err := l2.Get(i)
+			if err != nil {
+				t.Fatalf("Get failed: %v", err)
+			}
+
+			actual := binary.BigEndian.Uint64(buf)
+			if actual != uint64(i+1) {
+				t.Errorf("%d: want %d, got %d", i, i+1, actual)
+			}
 		}
 	})
+
+	/*
+		t.Run("Write after read", func(t *testing.T) {
+			l3, err := ReadList(f, l.offset)
+			if err != nil {
+				t.Fatalf("ReadList failed: %v", err)
+			}
+
+			originalLen := l3.Len()
+			inserts := 20
+
+			buf := make([]byte, l3.ElementSize())
+			for i := uint16(0); i < uint16(inserts); i++ {
+				binary.BigEndian.PutUint64(buf, uint64(i+1))
+				l3.Append(buf)
+			}
+
+			if l3.Len() != originalLen+inserts {
+				t.Errorf("got len %d, want %d", l3.Len(), originalLen+inserts)
+			}
+		})
+	*/
 }
