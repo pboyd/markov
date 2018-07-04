@@ -20,13 +20,13 @@ func TestMarshalValue(t *testing.T) {
 	}
 
 	for _, v1 := range cases {
-		buf, err := MarshalValue(v1)
+		buf, err := marshalValue(v1)
 		if err != nil {
 			t.Errorf("%v: got MarshalValue error %v", v1, err)
 			continue
 		}
 
-		v2, err := UnmarshalValue(buf)
+		v2, err := unmarshalValue(buf)
 		if err != nil {
 			t.Errorf("%v: got UnmarshalValue error %v", 11, err)
 			continue

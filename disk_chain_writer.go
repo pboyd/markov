@@ -41,7 +41,7 @@ func (c *DiskChainWriter) Get(id int) (interface{}, error) {
 		return nil, err
 	}
 
-	return UnmarshalValue(valueBuf)
+	return unmarshalValue(valueBuf)
 }
 
 func (c *DiskChainWriter) Links(id int) ([]Link, error) {
@@ -94,7 +94,7 @@ func (c *DiskChainWriter) Add(value interface{}) (int, error) {
 		return existing, nil
 	}
 
-	valueBuf, err := MarshalValue(value)
+	valueBuf, err := marshalValue(value)
 	if err != nil {
 		return 0, err
 	}

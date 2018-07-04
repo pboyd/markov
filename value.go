@@ -18,7 +18,7 @@ const (
 	float64Value
 )
 
-func MarshalValue(value interface{}) ([]byte, error) {
+func marshalValue(value interface{}) ([]byte, error) {
 	switch v := value.(type) {
 	case string:
 		return marshalString(v)
@@ -52,7 +52,7 @@ func MarshalValue(value interface{}) ([]byte, error) {
 	return nil, nil
 }
 
-func UnmarshalValue(buf []byte) (interface{}, error) {
+func unmarshalValue(buf []byte) (interface{}, error) {
 	if len(buf) == 0 {
 		return nil, nil
 	}
