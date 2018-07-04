@@ -51,8 +51,6 @@ func main() {
 	}
 	markov.Feed(chain, words)
 
-	fmt.Printf("build done")
-
 	walker := markov.RandomWalker(chain, 0)
 
 	for generated := 0; generated < wordCount; generated++ {

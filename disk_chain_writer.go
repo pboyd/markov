@@ -12,8 +12,8 @@ var _ ReadWriteChain = &DiskChainWriter{}
 const (
 	diskHeader = "MKV\u0001"
 
-	// Put the index right after the header
-	indexOffset = int64(len(diskHeader))
+	linkListItemSize       = 12
+	linkListItemsPerBucket = 8
 )
 
 type DiskChainWriter struct {
@@ -45,35 +45,31 @@ func (c *DiskChainWriter) Get(id int) (interface{}, error) {
 }
 
 func (c *DiskChainWriter) Links(id int) ([]Link, error) {
-	// FIXME: id == 0 is a special case
+	if id == 0 {
+		id = len(diskHeader)
+	}
 
-	// I have no way to know the size that this should be..
-	links := []Link{}
-	counts := []uint32{}
-	sum := 0
-
-	item, err := c.linkList(int64(id))
+	list, err := c.linkList(int64(id))
 	if err != nil {
 		return nil, err
 	}
 
-	for item != nil {
-		value, err := item.Value()
+	total := list.Len()
+
+	links := make([]Link, total)
+	counts := make([]uint32, total)
+	sum := 0
+
+	for i := 0; i < total; i++ {
+		value, err := list.Get(uint16(i))
 		if err != nil {
 			return nil, err
 		}
 
 		id, count := c.unpackLinkValue(value)
 		sum += int(count)
-		counts = append(counts, count)
-		links = append(links, Link{
-			ID: id,
-		})
-
-		item, err = item.Next()
-		if err != nil {
-			return nil, err
-		}
+		counts[i] = count
+		links[i] = Link{ID: id}
 	}
 
 	for i := range links {
@@ -110,61 +106,50 @@ func (c *DiskChainWriter) Add(value interface{}) (int, error) {
 
 	c.index[value] = id
 
-	_, err = disk.NewList(c.file, c.packLinkValue(-1, 0))
+	_, err = disk.NewList(c.file, linkListItemSize, linkListItemsPerBucket)
 
 	return int(id), err
 }
 
 func (c *DiskChainWriter) Relate(parent, child int, delta int) error {
-	item, err := c.linkList(int64(parent))
+	list, err := c.linkList(int64(parent))
 	if err != nil {
 		return err
 	}
 
-	for {
-		value, err := item.Value()
+	newChild := true
+
+	// Check for an existing entry
+	for i := 0; i < list.Len(); i++ {
+		value, err := list.Get(uint16(i))
 		if err != nil {
 			return err
 		}
 
 		id, count := c.unpackLinkValue(value)
-
-		// FIXME: What about uint32 overflows?
-		if id < 0 {
-			// It's a new list with a place holder value.
-			return item.SetValue(c.packLinkValue(child, uint32(delta)))
-		}
-
 		if id == child {
 			count += uint32(delta)
-			return item.SetValue(c.packLinkValue(id, count))
-		}
-
-		next, err := item.Next()
-		if err != nil {
-			return err
-		}
-
-		if next == nil {
+			c.updateLinkCount(value, count)
+			newChild = false
 			break
 		}
-
-		item = next
 	}
 
-	item.InsertAfter(c.packLinkValue(child, uint32(delta)))
+	if newChild {
+		list.Append(c.packLinkValue(child, uint32(delta)))
+	}
 
-	return nil
+	return list.Flush()
 }
 
-func (c *DiskChainWriter) linkList(id int64) (*disk.ListItem, error) {
+func (c *DiskChainWriter) linkList(id int64) (*disk.List, error) {
 	skip, err := c.file.ReadBlobSize(id)
 	if err != nil {
 		return nil, err
 	}
 
 	linkOffset := id + disk.BlobHeaderLength + int64(skip)
-	return disk.ReadList(c.file, linkOffset), nil
+	return disk.ReadList(c.file, linkOffset)
 }
 
 func (c *DiskChainWriter) unpackLinkValue(value []byte) (id int, count uint32) {
@@ -176,6 +161,10 @@ func (c *DiskChainWriter) unpackLinkValue(value []byte) (id int, count uint32) {
 func (c *DiskChainWriter) packLinkValue(id int, count uint32) []byte {
 	buf := make([]byte, 12)
 	binary.BigEndian.PutUint64(buf, uint64(id))
-	binary.BigEndian.PutUint32(buf[8:], uint32(count))
+	binary.BigEndian.PutUint32(buf[8:], count)
 	return buf
+}
+
+func (c *DiskChainWriter) updateLinkCount(buf []byte, count uint32) {
+	binary.BigEndian.PutUint32(buf[8:], count)
 }
