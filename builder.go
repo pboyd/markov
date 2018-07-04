@@ -1,12 +1,14 @@
 package markov
 
 type Builder struct {
-	nodes map[interface{}]*builderNode
+	initial interface{}
+	nodes   map[interface{}]*builderNode
 }
 
-func NewBuilder() *Builder {
+func NewBuilder(initial interface{}) *Builder {
 	return &Builder{
-		nodes: make(map[interface{}]*builderNode, 1),
+		initial: initial,
+		nodes:   make(map[interface{}]*builderNode, 1),
 	}
 }
 
@@ -39,7 +41,7 @@ func (b *Builder) Build() []*Node {
 }
 
 func (b *Builder) Feed(values <-chan interface{}) {
-	last := b.getNode(nil)
+	last := b.getNode(b.initial)
 
 	for val := range values {
 		last.counts[val]++
