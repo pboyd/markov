@@ -2,7 +2,7 @@ package markov
 
 type Builder struct {
 	initial interface{}
-	Chain   *Chain
+	Chain   *MemoryChain
 }
 
 func NewBuilder(initial interface{}) *Builder {
@@ -12,12 +12,12 @@ func NewBuilder(initial interface{}) *Builder {
 	}
 }
 
-func (b *Builder) Root() *Node {
-	return b.Chain.GetNode(b.initial)
+func (b *Builder) Root() *MemoryNode {
+	return b.Chain.Get(b.initial)
 }
 
 func (b *Builder) Feed(values <-chan interface{}) {
-	last := b.Chain.GetNode(b.initial)
+	last := b.Chain.Get(b.initial)
 
 	for val := range values {
 		last = last.Mark(val)

@@ -2,54 +2,41 @@ package markov
 
 import "math/rand"
 
-type Chain struct {
-	nodes map[interface{}]*Node
+type MemoryChain struct {
+	nodes map[interface{}]*MemoryNode
 }
 
-func NewChain() *Chain {
-	return &Chain{
-		nodes: map[interface{}]*Node{},
+func NewChain() *MemoryChain {
+	return &MemoryChain{
+		nodes: map[interface{}]*MemoryNode{},
 	}
 }
 
-func (c *Chain) RandomNode() *Node {
-	r := rand.Intn(len(c.nodes))
-	i := 0
-	for _, n := range c.nodes {
-		if i == r {
-			return n
-		}
-		i++
-	}
-
-	return nil
-}
-
-func (c *Chain) GetNode(value interface{}) *Node {
+func (c *MemoryChain) Get(value interface{}) *MemoryNode {
 	node, ok := c.nodes[value]
 	if !ok {
-		node = &Node{
+		node = &MemoryNode{
 			Value:    value,
 			chain:    c,
-			children: []*childNode{},
+			children: []*memoryChildNode{},
 		}
 		c.nodes[value] = node
 	}
 	return node
 }
 
-type Node struct {
+type MemoryNode struct {
 	Value    interface{}
-	chain    *Chain
-	children []*childNode
+	chain    *MemoryChain
+	children []*memoryChildNode
 }
 
-type childNode struct {
-	*Node
+type memoryChildNode struct {
+	*MemoryNode
 	Count int
 }
 
-func (n *Node) findChild(value interface{}) *childNode {
+func (n *MemoryNode) findChild(value interface{}) *memoryChildNode {
 	for _, child := range n.children {
 		if child.Value == value {
 			return child
@@ -59,13 +46,13 @@ func (n *Node) findChild(value interface{}) *childNode {
 	return nil
 }
 
-func (n *Node) Mark(value interface{}) *Node {
-	child := n.chain.GetNode(value)
+func (n *MemoryNode) Mark(value interface{}) *MemoryNode {
+	child := n.chain.Get(value)
 
 	cn := n.findChild(child.Value)
 	if cn == nil {
-		cn = &childNode{
-			Node: child,
+		cn = &memoryChildNode{
+			MemoryNode: child,
 		}
 		n.children = append(n.children, cn)
 	}
@@ -75,7 +62,7 @@ func (n *Node) Mark(value interface{}) *Node {
 	return child
 }
 
-func (n *Node) sum() int {
+func (n *MemoryNode) sum() int {
 	total := 0
 	for _, c := range n.children {
 		total += c.Count
@@ -84,7 +71,7 @@ func (n *Node) sum() int {
 	return total
 }
 
-func (n *Node) Probabilities() map[interface{}]float64 {
+func (n *MemoryNode) Probabilities() map[interface{}]float64 {
 	total := float64(n.sum())
 	p := make(map[interface{}]float64, len(n.children))
 
@@ -95,7 +82,7 @@ func (n *Node) Probabilities() map[interface{}]float64 {
 	return p
 }
 
-func (n *Node) Next() *Node {
+func (n *MemoryNode) Next() *MemoryNode {
 	if len(n.children) == 0 {
 		// This happens if the chain ends
 		return nil
@@ -107,7 +94,7 @@ func (n *Node) Next() *Node {
 	for _, child := range n.children {
 		passed += child.Count
 		if passed > index {
-			return child.Node
+			return child.MemoryNode
 		}
 	}
 
