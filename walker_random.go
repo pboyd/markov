@@ -32,6 +32,7 @@ func (w *RandomWalker) Next() (Value, error) {
 	for _, link := range links {
 		passed += link.Probability
 		if passed > index {
+			w.last = link.ID
 			return w.chain.Get(link.ID)
 		}
 	}
