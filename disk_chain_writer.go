@@ -12,8 +12,8 @@ var _ ReadWriteChain = &DiskChainWriter{}
 var diskHeader = []byte{'M', 'K', 'V', 1}
 
 type DiskChainWriter struct {
-	ReadWriteChain
-	file *disk.File
+	valueIndex map[interface{}]int
+	file       *disk.File
 }
 
 func NewDiskChainWriter(w io.ReadWriteSeeker) (*DiskChainWriter, error) {
@@ -25,28 +25,33 @@ func NewDiskChainWriter(w io.ReadWriteSeeker) (*DiskChainWriter, error) {
 	file := disk.NewFile(w)
 
 	return &DiskChainWriter{
-		ReadWriteChain: &MemoryChain{},
-		file:           file,
+		valueIndex: map[interface{}]int{},
+		file:       file,
 	}, nil
 }
 
-/*
 func (c *DiskChainWriter) Get(id int) (interface{}, error) {
-	return nil, ErrNotFound
+	valueBuf, err := c.file.ReadBlob(int64(id))
+	if err != nil {
+		return nil, err
+	}
+
+	return UnmarshalValue(valueBuf)
 }
-*/
 
 func (c *DiskChainWriter) Links(id int) ([]Link, error) {
 	// FIXME: id == 0 is a special case
-
-	id = translateDiskID(id)
 
 	// I have no way to know the size that this should be..
 	links := []Link{}
 	counts := []uint32{}
 	sum := 0
 
-	item := disk.ReadList(c.file, int64(id))
+	item, err := c.linkList(int64(id))
+	if err != nil {
+		return nil, err
+	}
+
 	for item != nil {
 		value, err := item.Value()
 		if err != nil {
@@ -73,33 +78,43 @@ func (c *DiskChainWriter) Links(id int) ([]Link, error) {
 	return links, nil
 }
 
-/*
-func (c *DiskChainWriter) Find(interface{}) (id int, err error) {
-	return 0, ErrNotFound
+func (c *DiskChainWriter) Find(value interface{}) (id int, err error) {
+	id, ok := c.valueIndex[value]
+	if !ok {
+		return 0, ErrNotFound
+	}
+
+	return id, nil
 }
-*/
 
 func (c *DiskChainWriter) Add(value interface{}) (int, error) {
-	id, err := c.ReadWriteChain.Add(value)
+	existing, err := c.Find(value)
+	if err == nil {
+		return existing, nil
+	}
+
+	valueBuf, err := MarshalValue(value)
 	if err != nil {
 		return 0, err
 	}
 
+	id, err := c.file.WriteBlob(-1, valueBuf)
+	if err != nil {
+		return 0, err
+	}
+
+	c.valueIndex[value] = int(id)
+
 	_, err = disk.NewList(c.file, c.packLinkValue(-1, 0))
 
-	return id, err
-}
-
-func translateDiskID(id int) int {
-	// This is temporary. Disk ID will eventually be the ID.
-	return id*22 + len(diskHeader)
+	return int(id), err
 }
 
 func (c *DiskChainWriter) Relate(parent, child int, delta int) error {
-	parent = translateDiskID(parent)
-	child = translateDiskID(child)
-
-	item := disk.ReadList(c.file, int64(parent))
+	item, err := c.linkList(int64(parent))
+	if err != nil {
+		return err
+	}
 
 	for {
 		value, err := item.Value()
@@ -135,6 +150,16 @@ func (c *DiskChainWriter) Relate(parent, child int, delta int) error {
 	item.InsertAfter(c.packLinkValue(child, uint32(delta)))
 
 	return nil
+}
+
+func (c *DiskChainWriter) linkList(id int64) (*disk.ListItem, error) {
+	skip, err := c.file.ReadBlobSize(id)
+	if err != nil {
+		return nil, err
+	}
+
+	linkOffset := id + disk.BlobHeaderLength + int64(skip)
+	return disk.ReadList(c.file, linkOffset), nil
 }
 
 func (c *DiskChainWriter) unpackLinkValue(value []byte) (id int, count uint32) {

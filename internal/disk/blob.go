@@ -6,8 +6,8 @@ import (
 )
 
 const (
-	maxBlobSize    = 1 << 16
-	blobSizeLength = 2
+	maxBlobSize      = 1 << 16
+	BlobHeaderLength = 2
 )
 
 // WriteBlob writes a variable length buffer to the given offset.
@@ -16,7 +16,7 @@ func (f *File) WriteBlob(offset int64, buf []byte) (int64, error) {
 		return 0, errors.New("blob exceeds max size")
 	}
 
-	size := make([]byte, blobSizeLength)
+	size := make([]byte, BlobHeaderLength)
 	binary.BigEndian.PutUint16(size, uint16(len(buf)))
 
 	startOffset, err := f.Write(offset, size)
@@ -49,7 +49,7 @@ func (f *File) OverwriteBlob(offset int64, buf []byte) error {
 }
 
 func (f *File) ReadBlobSize(offset int64) (uint16, error) {
-	sizeBuf, err := f.Read(offset, blobSizeLength)
+	sizeBuf, err := f.Read(offset, BlobHeaderLength)
 	if err != nil {
 		return 0, err
 	}
@@ -63,5 +63,5 @@ func (f *File) ReadBlob(offset int64) ([]byte, error) {
 		return nil, err
 	}
 
-	return f.Read(offset+blobSizeLength, int64(size))
+	return f.Read(offset+BlobHeaderLength, int64(size))
 }
