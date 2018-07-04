@@ -41,34 +41,41 @@ func main() {
 
 	log.Printf("seed=%d", seed)
 
-	var letterNode, lengthNode *markov.Node
+	letterChain := &markov.MemoryChain{}
+	lengthChain := &markov.MemoryChain{}
 
 	wg := sync.WaitGroup{}
 	wg.Add(2)
 	go func() {
-		b := markov.NewBuilder(' ')
-		b.Feed(letters)
-		letterNode = b.Root()
+		markov.Feed(letterChain, letters)
 		wg.Done()
 	}()
 
 	go func() {
-		b := markov.NewBuilder(0)
-		b.Feed(lengths)
-		lengthNode = b.Root()
+		markov.Feed(lengthChain, lengths)
 		wg.Done()
 	}()
 
 	wg.Wait()
 
-	for generated := 0; generated < wordCount; generated++ {
-		lengthNode = lengthNode.Next()
-		length := lengthNode.Value.(int)
+	lengthWalker := markov.NewRandomWalker(lengthChain, 0)
+	letterWalker := markov.NewRandomWalker(letterChain, 0)
 
-		for i := 0; i < length; i++ {
-			letterNode = letterNode.Next()
-			r := letterNode.Value.(rune)
-			fmt.Print(string(r))
+	for generated := 0; generated < wordCount; generated++ {
+		length, err := lengthWalker.Next()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "error getting next length: %v\n", err)
+			os.Exit(2)
+		}
+
+		for i := 0; i < length.(int); i++ {
+			letter, err := letterWalker.Next()
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "error getting next letter: %v\n", err)
+				os.Exit(2)
+			}
+
+			fmt.Print(string(letter.(rune)))
 		}
 
 		fmt.Print(" ")
@@ -77,7 +84,7 @@ func main() {
 	fmt.Print("\n")
 }
 
-func readFile(path string) (<-chan interface{}, <-chan interface{}, error) {
+func readFile(path string) (<-chan markov.Value, <-chan markov.Value, error) {
 	fh, err := os.Open(path)
 	if err != nil {
 		return nil, nil, err
@@ -85,10 +92,12 @@ func readFile(path string) (<-chan interface{}, <-chan interface{}, error) {
 
 	reader := bufio.NewReader(fh)
 
-	letters := make(chan interface{})
-	lengths := make(chan interface{})
+	letters := make(chan markov.Value)
+	lengths := make(chan markov.Value)
 
 	go func() {
+		letters <- ' '
+
 		defer func() {
 			fh.Close()
 			close(letters)

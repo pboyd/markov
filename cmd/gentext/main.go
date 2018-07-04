@@ -5,7 +5,6 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"log"
 	"math/rand"
 	"os"
 	"strings"
@@ -36,24 +35,36 @@ func main() {
 
 	words, err := readFile(source)
 	if err != nil {
-		fmt.Printf("file error (%s): %v\n", source, err)
+		fmt.Fprintf(os.Stderr, "file error (%s): %v\n", source, err)
 		os.Exit(1)
 	}
 
-	b := markov.NewBuilder("")
-	b.Feed(words)
-	node := b.Chain.RandomNode()
+	chain := &markov.MemoryChain{}
+	markov.Feed(chain, words)
+
+	l, err := chain.Len()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "len error: %v\n", err)
+		os.Exit(2)
+	}
+
+	walker := markov.NewRandomWalker(chain, rand.Intn(l))
 
 	for generated := 0; generated < wordCount; generated++ {
-		node = node.Next()
-		fmt.Print(node.Value.(string))
+		word, err := walker.Next()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "error generating word: %v\n", err)
+			os.Exit(2)
+		}
+
+		fmt.Print(word.(string))
 		fmt.Print(" ")
 	}
 
 	fmt.Print("\n")
 }
 
-func readFile(path string) (<-chan interface{}, error) {
+func readFile(path string) (<-chan markov.Value, error) {
 	fh, err := os.Open(path)
 	if err != nil {
 		return nil, err
@@ -61,7 +72,7 @@ func readFile(path string) (<-chan interface{}, error) {
 
 	reader := bufio.NewReader(fh)
 
-	words := make(chan interface{})
+	words := make(chan markov.Value)
 
 	go func() {
 		defer func() {
@@ -75,7 +86,7 @@ func readFile(path string) (<-chan interface{}, error) {
 			r, _, err := reader.ReadRune()
 			if err != nil {
 				if err != io.EOF {
-					log.Printf("error reading file: %v", err)
+					fmt.Fprintf(os.Stderr, "error reading file: %v", err)
 				}
 				break
 			}
