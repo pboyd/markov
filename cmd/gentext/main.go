@@ -42,13 +42,7 @@ func main() {
 	chain := &markov.MemoryChain{}
 	markov.Feed(chain, words)
 
-	l, err := chain.Len()
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "len error: %v\n", err)
-		os.Exit(2)
-	}
-
-	walker := markov.NewRandomWalker(chain, rand.Intn(l))
+	walker := markov.RandomWalker(chain, 0)
 
 	for generated := 0; generated < wordCount; generated++ {
 		word, err := walker.Next()

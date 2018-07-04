@@ -16,7 +16,7 @@ func BenchmarkBuildDuplicate(b *testing.B) {
 func BenchmarkRandomWalk(b *testing.B) {
 	chain := NewMemoryChain(b.N)
 	Feed(chain, normalDistGenerator(b.N, b.N/4))
-	walker := NewRandomWalker(chain, 0)
+	walker := RandomWalker(chain, 0)
 
 	b.ResetTimer()
 

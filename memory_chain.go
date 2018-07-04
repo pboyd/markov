@@ -54,13 +54,6 @@ func (c *MemoryChain) Find(value Value) (int, error) {
 	return id, nil
 }
 
-func (c *MemoryChain) Len() (int, error) {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-
-	return len(c.values), nil
-}
-
 func (c *MemoryChain) Add(value Value) (int, error) {
 	existing, err := c.Find(value)
 	if err == nil {

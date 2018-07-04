@@ -12,7 +12,6 @@ type Chain interface {
 	Get(id int) (Value, error)
 	Links(id int) ([]Link, error)
 	Find(Value) (id int, err error)
-	Len() (int, error)
 }
 
 // WriteChain is a Markov chain that can only be written.

@@ -14,7 +14,7 @@ func TestRandomWalker(t *testing.T) {
 	counts := map[Value]int{}
 
 	for i := 0; i < iterations; i++ {
-		walker := NewRandomWalker(chain, 0)
+		walker := RandomWalker(chain, 0)
 		value, err := walker.Next()
 		if err != nil {
 			t.Fatalf("got error: %v", err)
@@ -45,7 +45,7 @@ func TestRandomWalkerWalk(t *testing.T) {
 	chain := &MemoryChain{}
 	Feed(chain, split(testText))
 
-	walker := NewRandomWalker(chain, 0)
+	walker := RandomWalker(chain, 0)
 	for i := 0; i < 100; i++ {
 		value, err := walker.Next()
 		if err != nil {

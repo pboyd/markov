@@ -2,21 +2,21 @@ package markov
 
 import "math/rand"
 
-var _ Walker = &RandomWalker{}
+var _ Walker = &randomWalker{}
 
-type RandomWalker struct {
+type randomWalker struct {
 	chain Chain
 	last  int
 }
 
-func NewRandomWalker(chain Chain, startID int) *RandomWalker {
-	return &RandomWalker{
+func RandomWalker(chain Chain, startID int) Walker {
+	return &randomWalker{
 		chain: chain,
 		last:  startID,
 	}
 }
 
-func (w *RandomWalker) Next() (Value, error) {
+func (w *randomWalker) Next() (Value, error) {
 	links, err := w.chain.Links(w.last)
 	if err != nil {
 		return 0, err

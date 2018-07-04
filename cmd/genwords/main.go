@@ -58,8 +58,8 @@ func main() {
 
 	wg.Wait()
 
-	lengthWalker := markov.NewRandomWalker(lengthChain, 0)
-	letterWalker := markov.NewRandomWalker(letterChain, 0)
+	lengthWalker := markov.RandomWalker(lengthChain, 0)
+	letterWalker := markov.RandomWalker(letterChain, 0)
 
 	for generated := 0; generated < wordCount; generated++ {
 		length, err := lengthWalker.Next()
