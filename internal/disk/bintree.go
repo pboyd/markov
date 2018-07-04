@@ -15,20 +15,20 @@ const (
 
 type BinaryTreeNode struct {
 	f      *File
-	offset int64
+	Offset int64
 }
 
 func NewBinaryTree(f *File) *BinaryTreeNode {
 	return &BinaryTreeNode{
 		f:      f,
-		offset: -1,
+		Offset: -1,
 	}
 }
 
 func ReadBinaryTree(f *File, offset int64) *BinaryTreeNode {
 	return &BinaryTreeNode{
 		f:      f,
-		offset: offset,
+		Offset: offset,
 	}
 }
 
@@ -37,7 +37,7 @@ func (root *BinaryTreeNode) Search(key []byte) (*BinaryTreeNode, error) {
 }
 
 func (root *BinaryTreeNode) searchByHash(keyHash uint64) (*BinaryTreeNode, error) {
-	if root.offset < 0 {
+	if root.Offset < 0 {
 		return nil, nil
 	}
 
@@ -53,9 +53,9 @@ func (root *BinaryTreeNode) searchByHash(keyHash uint64) (*BinaryTreeNode, error
 	child := &BinaryTreeNode{f: root.f}
 	switch {
 	case keyHash > rootKey:
-		child.offset, err = root.right()
+		child.Offset, err = root.right()
 	case keyHash < rootKey:
-		child.offset, err = root.left()
+		child.Offset, err = root.left()
 	}
 	if err != nil {
 		return nil, err
@@ -64,24 +64,24 @@ func (root *BinaryTreeNode) searchByHash(keyHash uint64) (*BinaryTreeNode, error
 	return child.searchByHash(keyHash)
 }
 
-func (root *BinaryTreeNode) Insert(key []byte, value int64) error {
+func (root *BinaryTreeNode) Insert(key []byte, value int64) (*BinaryTreeNode, error) {
 	keyHash := root.hashKey(key)
 	return root.insertHash(keyHash, value)
 }
 
-func (root *BinaryTreeNode) insertHash(keyHash uint64, value int64) error {
-	if root.offset < 0 {
-		return root.create(keyHash, value)
+func (root *BinaryTreeNode) insertHash(keyHash uint64, value int64) (*BinaryTreeNode, error) {
+	if root.Offset < 0 {
+		return root, root.create(keyHash, value)
 	}
 
 	rootKey, err := root.key()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	switch {
 	case keyHash == rootKey:
-		return root.setValue(value)
+		return root, root.SetValue(value)
 	case keyHash > rootKey:
 		return root.insertChild(bstRightOffset, keyHash, value)
 	default:
@@ -89,28 +89,27 @@ func (root *BinaryTreeNode) insertHash(keyHash uint64, value int64) error {
 	}
 }
 
-func (root *BinaryTreeNode) insertChild(refOffset int64, keyHash uint64, value int64) error {
-	address, err := root.f.readAddress(root.offset + refOffset)
+func (root *BinaryTreeNode) insertChild(refOffset int64, keyHash uint64, value int64) (*BinaryTreeNode, error) {
+	address, err := root.f.readAddress(root.Offset + refOffset)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	node := &BinaryTreeNode{
 		f:      root.f,
-		offset: address,
+		Offset: address,
 	}
 
-	err = node.insertHash(keyHash, value)
+	child, err := node.insertHash(keyHash, value)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	if address < 0 {
-		_, err = root.f.writeAddress(root.offset+refOffset, node.offset)
-		return err
+		_, err = root.f.writeAddress(root.Offset+refOffset, node.Offset)
 	}
 
-	return nil
+	return child, err
 }
 
 func (root *BinaryTreeNode) create(keyHash uint64, value int64) error {
@@ -121,21 +120,21 @@ func (root *BinaryTreeNode) create(keyHash uint64, value int64) error {
 	binary.BigEndian.PutUint64(buf[bstValueOffset:], uint64(value))
 
 	var err error
-	root.offset, err = root.f.Write(-1, buf)
+	root.Offset, err = root.f.Write(-1, buf)
 	return err
 }
 
-func (root *BinaryTreeNode) setValue(value int64) error {
-	_, err := root.f.writeAddress(root.offset+bstValueOffset, value)
+func (root *BinaryTreeNode) SetValue(value int64) error {
+	_, err := root.f.writeAddress(root.Offset+bstValueOffset, value)
 	return err
 }
 
 func (root *BinaryTreeNode) Value() (int64, error) {
-	return root.f.readAddress(root.offset + bstValueOffset)
+	return root.f.readAddress(root.Offset + bstValueOffset)
 }
 
 func (root *BinaryTreeNode) key() (uint64, error) {
-	buf, err := root.f.Read(root.offset+bstKeyOffset, 8)
+	buf, err := root.f.Read(root.Offset+bstKeyOffset, 8)
 	if err != nil {
 		return 0, err
 	}
@@ -143,11 +142,11 @@ func (root *BinaryTreeNode) key() (uint64, error) {
 }
 
 func (root *BinaryTreeNode) left() (int64, error) {
-	return root.f.readAddress(root.offset + bstLeftOffset)
+	return root.f.readAddress(root.Offset + bstLeftOffset)
 }
 
 func (root *BinaryTreeNode) right() (int64, error) {
-	return root.f.readAddress(root.offset + bstRightOffset)
+	return root.f.readAddress(root.Offset + bstRightOffset)
 }
 
 func (BinaryTreeNode) hashKey(buf []byte) uint64 {

@@ -19,7 +19,19 @@ func TestBinTree(t *testing.T) {
 
 	root := NewBinaryTree(f)
 	for _, c := range cases {
-		root.Insert(c.key, c.value)
+		n, err := root.Insert(c.key, c.value)
+		if err != nil {
+			t.Fatalf("got error %v, want nil", err)
+		}
+
+		actual, err := n.Value()
+		if err != nil {
+			t.Fatalf("got error %v, want nil", err)
+		}
+
+		if actual != c.value {
+			t.Errorf("got %d, want %d", actual, c.value)
+		}
 	}
 
 	for _, c := range cases {

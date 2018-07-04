@@ -9,15 +9,21 @@ import (
 
 var _ ReadWriteChain = &DiskChainWriter{}
 
-var diskHeader = []byte{'M', 'K', 'V', 1}
+const (
+	diskHeader = "MKV\u0001"
+
+	// Put the index right after the header
+	indexOffset = int64(len(diskHeader))
+)
 
 type DiskChainWriter struct {
-	valueIndex map[interface{}]int
-	file       *disk.File
+	file *disk.File
+
+	indexCreated bool
 }
 
 func NewDiskChainWriter(w io.ReadWriteSeeker) (*DiskChainWriter, error) {
-	_, err := w.Write(diskHeader)
+	_, err := w.Write([]byte(diskHeader))
 	if err != nil {
 		return nil, err
 	}
@@ -25,8 +31,7 @@ func NewDiskChainWriter(w io.ReadWriteSeeker) (*DiskChainWriter, error) {
 	file := disk.NewFile(w)
 
 	return &DiskChainWriter{
-		valueIndex: map[interface{}]int{},
-		file:       file,
+		file: file,
 	}, nil
 }
 
@@ -78,22 +83,45 @@ func (c *DiskChainWriter) Links(id int) ([]Link, error) {
 	return links, nil
 }
 
-func (c *DiskChainWriter) Find(value interface{}) (id int, err error) {
-	id, ok := c.valueIndex[value]
-	if !ok {
+func (c *DiskChainWriter) Find(value interface{}) (int, error) {
+	valueBuf, err := MarshalValue(value)
+	if err != nil {
+		return 0, err
+	}
+
+	return c.findByRawKey(valueBuf)
+}
+
+func (c *DiskChainWriter) findByRawKey(value []byte) (int, error) {
+	root := disk.ReadBinaryTree(c.file, indexOffset)
+	node, err := root.Search(value)
+	if err != nil {
+		return 0, err
+	}
+
+	if node == nil {
 		return 0, ErrNotFound
 	}
 
-	return id, nil
+	id, err := node.Value()
+	if id == 0 {
+		panic(node.Offset)
+	}
+	return int(id), err
 }
 
 func (c *DiskChainWriter) Add(value interface{}) (int, error) {
-	existing, err := c.Find(value)
+	valueBuf, err := MarshalValue(value)
+	if err != nil {
+		return 0, err
+	}
+
+	existing, err := c.findByRawKey(valueBuf)
 	if err == nil {
 		return existing, nil
 	}
 
-	valueBuf, err := MarshalValue(value)
+	indexNode, err := c.createIndexEntry(valueBuf)
 	if err != nil {
 		return 0, err
 	}
@@ -103,7 +131,10 @@ func (c *DiskChainWriter) Add(value interface{}) (int, error) {
 		return 0, err
 	}
 
-	c.valueIndex[value] = int(id)
+	err = indexNode.SetValue(id)
+	if err != nil {
+		return 0, err
+	}
 
 	_, err = disk.NewList(c.file, c.packLinkValue(-1, 0))
 
@@ -173,4 +204,21 @@ func (c *DiskChainWriter) packLinkValue(id int, count uint32) []byte {
 	binary.BigEndian.PutUint64(buf, uint64(id))
 	binary.BigEndian.PutUint32(buf[8:], uint32(count))
 	return buf
+}
+
+func (c *DiskChainWriter) createIndexEntry(key []byte) (*disk.BinaryTreeNode, error) {
+	if !c.indexCreated {
+		root := disk.NewBinaryTree(c.file)
+		c.indexCreated = true
+		_, err := root.Insert(key, 0)
+
+		if root.Offset != indexOffset {
+			panic("index at wrong location")
+		}
+
+		return root, err
+	}
+
+	bst := disk.ReadBinaryTree(c.file, indexOffset)
+	return bst.Insert(key, 0)
 }
