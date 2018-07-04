@@ -29,19 +29,19 @@ func tempFile(t *testing.T) (io.ReadWriteSeeker, func()) {
 	return f, cleanup
 }
 
-func TestWriteRead(t *testing.T) {
-	f, cleanup := tempFile(t)
+func TestReadAppendWrite(t *testing.T) {
+	rw, cleanup := tempFile(t)
 	defer cleanup()
 
 	const iterations = 10
 
 	buf := make([]byte, 4)
 
-	w := NewWriter(f)
+	file := NewFile(rw)
 	for i := uint32(0); i < iterations; i++ {
 		binary.BigEndian.PutUint32(buf, i)
 
-		off, err := w.Append(buf)
+		off, err := file.Append(buf)
 		if err != nil {
 			t.Fatalf("Append error: %v", err)
 		}
@@ -51,9 +51,8 @@ func TestWriteRead(t *testing.T) {
 		}
 	}
 
-	r := NewReader(f)
 	for i := uint32(0); i < iterations; i++ {
-		buf, err := r.Read(int64(i*4), 4)
+		buf, err := file.Read(int64(i*4), 4)
 		if err != nil {
 			t.Fatalf("Read error: %v", err)
 		}
@@ -62,5 +61,22 @@ func TestWriteRead(t *testing.T) {
 		if actual != i {
 			t.Errorf("got %d, want %d", actual, i)
 		}
+	}
+
+	var val uint32 = 1<<32 - 1
+	binary.BigEndian.PutUint32(buf, val)
+	_, err := file.Write(4, buf)
+	if err != nil {
+		t.Fatalf("Write error: %v", err)
+	}
+
+	buf, err = file.Read(4, 4)
+	if err != nil {
+		t.Errorf("Read error: %v", err)
+	}
+
+	actual := binary.BigEndian.Uint32(buf)
+	if actual != val {
+		t.Errorf("got %d, want %d", actual, val)
 	}
 }
