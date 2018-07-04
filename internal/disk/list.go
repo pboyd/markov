@@ -3,6 +3,7 @@ package disk
 import (
 	"encoding/binary"
 	"errors"
+	"io"
 )
 
 const listHeaderSize = 4
@@ -10,7 +11,7 @@ const listHeaderSize = 4
 var ErrOutOfBounds = errors.New("list index out of bounds")
 
 type List struct {
-	f           *File
+	file        io.ReadWriteSeeker
 	offset      int64
 	elementSize uint16
 	bucketCap   uint16
@@ -22,9 +23,9 @@ type List struct {
 	readBucketNumber uint16
 }
 
-func NewList(f *File, elementSize, bucketCap uint16) (*List, error) {
+func NewList(rws io.ReadWriteSeeker, elementSize, bucketCap uint16) (*List, error) {
 	l := &List{
-		f:           f,
+		file:        rws,
 		elementSize: elementSize,
 		bucketCap:   bucketCap,
 		offset:      -1,
@@ -34,7 +35,7 @@ func NewList(f *File, elementSize, bucketCap uint16) (*List, error) {
 		return nil, err
 	}
 
-	l.tailBucket, err = newListBucket(f, elementSize, bucketCap)
+	l.tailBucket, err = newListBucket(l.file, elementSize, bucketCap)
 	if err != nil {
 		return nil, err
 	}
@@ -46,7 +47,7 @@ func NewList(f *File, elementSize, bucketCap uint16) (*List, error) {
 
 func (l *List) Append(buf []byte) error {
 	if l.tailBucket.Count == l.bucketCap {
-		newTail, err := newListBucket(l.f, l.elementSize, l.bucketCap)
+		newTail, err := newListBucket(l.file, l.elementSize, l.bucketCap)
 		if err != nil {
 			return err
 		}
@@ -99,7 +100,7 @@ func (l *List) loadReadBucket(number uint16) (*listBucket, error) {
 		return nil, nil
 	}
 
-	bucket, err := readListBucket(l.f, offset, l.elementSize, l.bucketCap)
+	bucket, err := readListBucket(l.file, offset, l.elementSize, l.bucketCap)
 	if err != nil {
 		return nil, err
 	}
@@ -116,7 +117,7 @@ func (l *List) bucketOffset(number uint16) (int64, error) {
 
 	for i := uint16(0); i < number; i++ {
 		// FIXME: It shouldn't allocate a new buffer on every iteration
-		offset, err = l.f.readAddress(offset)
+		offset, err = readAddress(l.file, offset)
 		if err != nil {
 			return 0, err
 		}
@@ -136,7 +137,7 @@ func (l *List) loadTailBucket() error {
 		return err
 	}
 
-	l.tailBucket, err = readListBucket(l.f, bucketOffset, l.elementSize, l.bucketCap)
+	l.tailBucket, err = readListBucket(l.file, bucketOffset, l.elementSize, l.bucketCap)
 	l.tailBucketNumber = number
 	return err
 }
@@ -147,7 +148,7 @@ func (l *List) findTailBucket() (int64, uint16, error) {
 
 	for {
 		// FIXME: It shouldn't allocate a new buffer on every iteration
-		next, err := l.f.readAddress(offset)
+		next, err := readAddress(l.file, offset)
 		if err != nil {
 			return 0, 0, err
 		}
@@ -163,20 +164,20 @@ func (l *List) findTailBucket() (int64, uint16, error) {
 	return offset, number, nil
 }
 
-func ReadList(f *File, offset int64) (*List, error) {
-	buf, err := f.Read(offset, listHeaderSize)
+func ReadList(rws io.ReadWriteSeeker, offset int64) (*List, error) {
+	buf, err := Read(rws, offset, listHeaderSize)
 	if err != nil {
 		return nil, err
 	}
 
 	l := &List{
-		f:           f,
+		file:        rws,
 		elementSize: binary.BigEndian.Uint16(buf),
 		bucketCap:   binary.BigEndian.Uint16(buf[2:]),
 		offset:      offset,
 	}
 
-	l.readBucket, err = readListBucket(f, offset+listHeaderSize, l.elementSize, l.bucketCap)
+	l.readBucket, err = readListBucket(l.file, offset+listHeaderSize, l.elementSize, l.bucketCap)
 	if err != nil {
 		return nil, err
 	}
@@ -205,7 +206,7 @@ func (l *List) Offset() int64 {
 }
 
 func (l *List) Flush() error {
-	offset, err := l.f.Write(l.offset, l.header())
+	offset, err := Write(l.file, l.offset, l.header())
 	if err != nil {
 		return err
 	}
@@ -222,7 +223,7 @@ func (l *List) header() []byte {
 }
 
 type listBucket struct {
-	f           *File
+	file        io.ReadWriteSeeker
 	offset      int64
 	dirty       bool
 	buf         []byte
@@ -230,9 +231,9 @@ type listBucket struct {
 	Count       uint16
 }
 
-func newListBucket(f *File, elementSize, cap uint16) (*listBucket, error) {
+func newListBucket(rws io.ReadWriteSeeker, elementSize, cap uint16) (*listBucket, error) {
 	b := &listBucket{
-		f:           f,
+		file:        rws,
 		offset:      -1,
 		elementSize: elementSize,
 		buf:         make([]byte, elementSize*cap+addressLength),
@@ -241,9 +242,9 @@ func newListBucket(f *File, elementSize, cap uint16) (*listBucket, error) {
 	return b, b.Flush()
 }
 
-func readListBucket(f *File, offset int64, elementSize, cap uint16) (*listBucket, error) {
+func readListBucket(rws io.ReadWriteSeeker, offset int64, elementSize, cap uint16) (*listBucket, error) {
 	b := &listBucket{
-		f:           f,
+		file:        rws,
 		offset:      offset,
 		elementSize: elementSize,
 	}
@@ -251,7 +252,7 @@ func readListBucket(f *File, offset int64, elementSize, cap uint16) (*listBucket
 	size := elementSize*cap + addressLength
 
 	var err error
-	b.buf, err = f.Read(offset, int64(size))
+	b.buf, err = Read(b.file, offset, int64(size))
 	if err != nil {
 		return nil, err
 	}
@@ -309,7 +310,7 @@ func (b *listBucket) Flush() error {
 		return nil
 	}
 
-	offset, err := b.f.Write(b.offset, b.buf)
+	offset, err := Write(b.file, b.offset, b.buf)
 	if err != nil {
 		return err
 	}

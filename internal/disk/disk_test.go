@@ -37,13 +37,12 @@ func TestReadAppendWrite(t *testing.T) {
 
 	buf := make([]byte, 4)
 
-	file := NewFile(rw)
 	for i := uint32(0); i < iterations; i++ {
 		binary.BigEndian.PutUint32(buf, i)
 
-		off, err := file.Append(buf)
+		off, err := Write(rw, -1, buf)
 		if err != nil {
-			t.Fatalf("Append error: %v", err)
+			t.Fatalf("Write error: %v", err)
 		}
 
 		if off != int64(i*4) {
@@ -52,7 +51,7 @@ func TestReadAppendWrite(t *testing.T) {
 	}
 
 	for i := uint32(0); i < iterations; i++ {
-		buf, err := file.Read(int64(i*4), 4)
+		buf, err := Read(rw, int64(i*4), 4)
 		if err != nil {
 			t.Fatalf("Read error: %v", err)
 		}
@@ -65,12 +64,12 @@ func TestReadAppendWrite(t *testing.T) {
 
 	var val uint32 = 1<<32 - 1
 	binary.BigEndian.PutUint32(buf, val)
-	_, err := file.Write(4, buf)
+	_, err := Write(rw, 4, buf)
 	if err != nil {
 		t.Fatalf("Write error: %v", err)
 	}
 
-	buf, err = file.Read(4, 4)
+	buf, err = Read(rw, 4, 4)
 	if err != nil {
 		t.Errorf("Read error: %v", err)
 	}

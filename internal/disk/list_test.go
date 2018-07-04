@@ -9,9 +9,7 @@ func TestList(t *testing.T) {
 	rw, cleanup := tempFile(t)
 	defer cleanup()
 
-	f := NewFile(rw)
-
-	l, err := NewList(f, 8, 16)
+	l, err := NewList(rw, 8, 16)
 	if err != nil {
 		t.Fatalf("NewList failed: %v", err)
 	}
@@ -65,7 +63,7 @@ func TestList(t *testing.T) {
 	})
 
 	t.Run("Read", func(t *testing.T) {
-		l2, err := ReadList(f, l.offset)
+		l2, err := ReadList(rw, l.offset)
 		if err != nil {
 			t.Fatalf("ReadList failed: %v", err)
 		}
@@ -94,25 +92,23 @@ func TestList(t *testing.T) {
 		}
 	})
 
-	/*
-		t.Run("Write after read", func(t *testing.T) {
-			l3, err := ReadList(f, l.offset)
-			if err != nil {
-				t.Fatalf("ReadList failed: %v", err)
-			}
+	t.Run("Write after read", func(t *testing.T) {
+		l3, err := ReadList(rw, l.offset)
+		if err != nil {
+			t.Fatalf("ReadList failed: %v", err)
+		}
 
-			originalLen := l3.Len()
-			inserts := 20
+		originalLen := l3.Len()
+		inserts := 20
 
-			buf := make([]byte, l3.ElementSize())
-			for i := uint16(0); i < uint16(inserts); i++ {
-				binary.BigEndian.PutUint64(buf, uint64(i+1))
-				l3.Append(buf)
-			}
+		buf := make([]byte, l3.ElementSize())
+		for i := uint16(0); i < uint16(inserts); i++ {
+			binary.BigEndian.PutUint64(buf, uint64(i+1))
+			l3.Append(buf)
+		}
 
-			if l3.Len() != originalLen+inserts {
-				t.Errorf("got len %d, want %d", l3.Len(), originalLen+inserts)
-			}
-		})
-	*/
+		if l3.Len() != originalLen+inserts {
+			t.Errorf("got len %d, want %d", l3.Len(), originalLen+inserts)
+		}
+	})
 }

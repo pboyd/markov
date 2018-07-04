@@ -27,7 +27,7 @@ func tempFile(t testing.TB) (io.ReadWriteSeeker, func()) {
 	return f, cleanup
 }
 
-func TestDiskChain(t *testing.T) {
+func TestDiskChainWriter(t *testing.T) {
 	f, cleanup := tempFile(t)
 	defer cleanup()
 
@@ -37,4 +37,23 @@ func TestDiskChain(t *testing.T) {
 	}
 
 	testReadWriteChain(t, writer)
+}
+
+func TestDiskChain(t *testing.T) {
+	f, cleanup := tempFile(t)
+	defer cleanup()
+
+	writer, err := NewDiskChainWriter(f)
+	if err != nil {
+		t.Fatalf("NewDiskChainWriter failed: %v", err)
+	}
+
+	testWriteChain(t, writer)
+
+	reader, err := NewDiskChain(f)
+	if err != nil {
+		t.Fatalf("NewDiskChain failed: %v", err)
+	}
+
+	testReadChain(t, reader)
 }

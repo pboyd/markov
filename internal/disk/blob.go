@@ -3,6 +3,7 @@ package disk
 import (
 	"encoding/binary"
 	"errors"
+	"io"
 )
 
 const (
@@ -11,7 +12,7 @@ const (
 )
 
 // WriteBlob writes a variable length buffer to the given offset.
-func (f *File) WriteBlob(offset int64, buf []byte) (int64, error) {
+func WriteBlob(ws io.WriteSeeker, offset int64, buf []byte) (int64, error) {
 	if len(buf) > maxBlobSize {
 		return 0, errors.New("blob exceeds max size")
 	}
@@ -19,23 +20,23 @@ func (f *File) WriteBlob(offset int64, buf []byte) (int64, error) {
 	size := make([]byte, BlobHeaderLength)
 	binary.BigEndian.PutUint16(size, uint16(len(buf)))
 
-	startOffset, err := f.Write(offset, size)
+	startOffset, err := Write(ws, offset, size)
 	if err != nil {
 		return 0, err
 	}
 
-	_, err = f.rw.Write(buf)
+	_, err = ws.Write(buf)
 	return startOffset, err
 }
 
 // OverwriteBlob modifies an existing blob. The new buffer must be the same
 // size as the original.
-func (f *File) OverwriteBlob(offset int64, buf []byte) error {
+func OverwriteBlob(rws io.ReadWriteSeeker, offset int64, buf []byte) error {
 	if offset < 0 {
 		return errors.New("OverwriteBlob with negative offset")
 	}
 
-	size, err := f.ReadBlobSize(offset)
+	size, err := ReadBlobSize(rws, offset)
 	if err != nil {
 		return err
 	}
@@ -44,12 +45,12 @@ func (f *File) OverwriteBlob(offset int64, buf []byte) error {
 		return errors.New("OverwriteBlob size mismatch")
 	}
 
-	_, err = f.rw.Write(buf)
+	_, err = rws.Write(buf)
 	return err
 }
 
-func (f *File) ReadBlobSize(offset int64) (uint16, error) {
-	sizeBuf, err := f.Read(offset, BlobHeaderLength)
+func ReadBlobSize(rs io.ReadSeeker, offset int64) (uint16, error) {
+	sizeBuf, err := Read(rs, offset, BlobHeaderLength)
 	if err != nil {
 		return 0, err
 	}
@@ -57,11 +58,11 @@ func (f *File) ReadBlobSize(offset int64) (uint16, error) {
 	return binary.BigEndian.Uint16(sizeBuf), nil
 }
 
-func (f *File) ReadBlob(offset int64) ([]byte, error) {
-	size, err := f.ReadBlobSize(offset)
+func ReadBlob(rs io.ReadSeeker, offset int64) ([]byte, error) {
+	size, err := ReadBlobSize(rs, offset)
 	if err != nil {
 		return nil, err
 	}
 
-	return f.readNext(int64(size))
+	return readNext(rs, int64(size))
 }

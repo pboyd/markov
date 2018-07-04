@@ -17,7 +17,7 @@ const (
 )
 
 type DiskChainWriter struct {
-	file  *disk.File
+	file  io.ReadWriteSeeker
 	index map[interface{}]int64
 }
 
@@ -27,16 +27,14 @@ func NewDiskChainWriter(w io.ReadWriteSeeker) (*DiskChainWriter, error) {
 		return nil, err
 	}
 
-	file := disk.NewFile(w)
-
 	return &DiskChainWriter{
-		file:  file,
+		file:  w,
 		index: make(map[interface{}]int64),
 	}, nil
 }
 
 func (c *DiskChainWriter) Get(id int) (interface{}, error) {
-	valueBuf, err := c.file.ReadBlob(int64(id))
+	valueBuf, err := disk.ReadBlob(c.file, int64(id))
 	if err != nil {
 		return nil, err
 	}
@@ -99,7 +97,7 @@ func (c *DiskChainWriter) Add(value interface{}) (int, error) {
 		return 0, err
 	}
 
-	id, err := c.file.WriteBlob(-1, valueBuf)
+	id, err := disk.WriteBlob(c.file, -1, valueBuf)
 	if err != nil {
 		return 0, err
 	}
@@ -143,7 +141,7 @@ func (c *DiskChainWriter) Relate(parent, child int, delta int) error {
 }
 
 func (c *DiskChainWriter) linkList(id int64) (*disk.List, error) {
-	skip, err := c.file.ReadBlobSize(id)
+	skip, err := disk.ReadBlobSize(c.file, id)
 	if err != nil {
 		return nil, err
 	}

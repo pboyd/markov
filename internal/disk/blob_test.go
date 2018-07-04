@@ -8,7 +8,6 @@ import (
 func TestBlob(t *testing.T) {
 	rw, cleanup := tempFile(t)
 	defer cleanup()
-	f := NewFile(rw)
 
 	buf := make([]byte, 8)
 	for i := range buf {
@@ -17,7 +16,7 @@ func TestBlob(t *testing.T) {
 
 	t.Run("Read/Write", func(t *testing.T) {
 		for i := int64(0); i < 10; i++ {
-			offset, err := f.WriteBlob(-1, buf)
+			offset, err := WriteBlob(rw, -1, buf)
 			if err != nil {
 				t.Fatalf("got error: %v", err)
 			}
@@ -26,7 +25,7 @@ func TestBlob(t *testing.T) {
 				t.Errorf("got offset %d, want %d", offset, i*10)
 			}
 
-			rbuf, err := f.ReadBlob(offset)
+			rbuf, err := ReadBlob(rw, offset)
 			if err != nil {
 				t.Fatalf("got read error: %v", err)
 			}
@@ -42,17 +41,17 @@ func TestBlob(t *testing.T) {
 
 		owbuf := make([]byte, 9)
 
-		err := f.OverwriteBlob(offset, owbuf)
+		err := OverwriteBlob(rw, offset, owbuf)
 		if err == nil {
 			t.Errorf("got nil error with wrong size buffer")
 		}
 
-		err = f.OverwriteBlob(offset, owbuf[:8])
+		err = OverwriteBlob(rw, offset, owbuf[:8])
 		if err != nil {
 			t.Fatalf("got write error: %v", err)
 		}
 
-		rbuf, err := f.ReadBlob(offset)
+		rbuf, err := ReadBlob(rw, offset)
 		if err != nil {
 			t.Fatalf("got read error: %v", err)
 		}
