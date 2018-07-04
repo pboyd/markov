@@ -1,8 +1,7 @@
 package markov
 
 import (
-	"fmt"
-	"strings"
+	"math"
 	"testing"
 	"unicode"
 )
@@ -13,11 +12,16 @@ func TestFeed(t *testing.T) {
 
 	b.Feed(runes)
 
-	nodes := b.Build()
+	root := b.Root()
+	if root.Value != ' ' {
+		t.Errorf(`got root value %q, want " "`, root.Value)
+	}
 
-	// 26 letters plus space, minus q, x and z = 23
-	if len(nodes) != 23 {
-		t.Errorf("got %d nodes, want 23", len(nodes))
+	// 88 words and 10 start with "A" or "a"
+	expectedPA := float64(10 / 88)
+	p := root.Probabilities()
+	if math.Abs(p['a']-expectedPA) < 0.001 {
+		t.Errorf("got %0.02f, want %0.02f", p['a'], expectedPA)
 	}
 }
 
@@ -36,6 +40,7 @@ func split(text string) <-chan interface{} {
 	return runes
 }
 
+/*
 func describe(n *Node) string {
 	out := &strings.Builder{}
 	fmt.Fprintln(out, string(n.Value.(rune)))
@@ -45,3 +50,4 @@ func describe(n *Node) string {
 
 	return out.String()
 }
+*/
