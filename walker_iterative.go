@@ -1,6 +1,18 @@
 package markov
 
 var _ Walker = &iterativeWalker{}
+var _ Walker = &iterativeChainWalker{}
+
+// IterativeChain is a chain that can be iterated efficiently.
+type IterativeChain interface {
+	Chain
+
+	// Next returns the ID of the entry which follows the input ID.
+	//
+	// If the ID is at the end of the chain, ErrBrokenChain will be
+	// returned.
+	Next(id int) (int, error)
+}
 
 type iterativeWalker struct {
 	chain Chain
@@ -9,6 +21,13 @@ type iterativeWalker struct {
 }
 
 func IterativeWalker(chain Chain) Walker {
+	if iw, ok := chain.(IterativeChain); ok {
+		return &iterativeChainWalker{
+			last:  -1,
+			chain: iw,
+		}
+	}
+
 	return &iterativeWalker{
 		chain: chain,
 	}
@@ -66,4 +85,24 @@ func (w *iterativeWalker) subtreeIDs(root int, ids map[int]struct{}) error {
 	}
 
 	return nil
+}
+
+type iterativeChainWalker struct {
+	chain IterativeChain
+	last  int
+}
+
+func (w *iterativeChainWalker) Next() (interface{}, error) {
+	id := 0
+	if w.last >= 0 {
+		var err error
+		id, err = w.chain.Next(w.last)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	w.last = id
+
+	return w.chain.Get(id)
 }

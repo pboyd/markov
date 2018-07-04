@@ -88,6 +88,17 @@ func (c *MemoryChain) Relate(parent, child int, delta int) error {
 	return nil
 }
 
+func (c *MemoryChain) Next(last int) (int, error) {
+	c.mu.RLock()
+	length := len(c.values)
+	c.mu.RUnlock()
+
+	if last >= length-1 {
+		return 0, ErrBrokenChain
+	}
+	return last + 1, nil
+}
+
 type linkCount struct {
 	ID    int
 	Count int
