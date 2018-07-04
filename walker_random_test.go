@@ -22,7 +22,7 @@ func TestRandomWalker(t *testing.T) {
 		counts[value]++
 	}
 
-	links, err := chain.Next(0)
+	links, err := chain.Links(0)
 	if err != nil {
 		t.Fatalf("got error: %v", err)
 	}

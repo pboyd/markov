@@ -17,7 +17,7 @@ func NewRandomWalker(chain Chain, startID int) *RandomWalker {
 }
 
 func (w *RandomWalker) Next() (Value, error) {
-	links, err := w.chain.Next(w.last)
+	links, err := w.chain.Links(w.last)
 	if err != nil {
 		return 0, err
 	}

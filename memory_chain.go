@@ -21,7 +21,7 @@ func (c *MemoryChain) Get(id int) (Value, error) {
 	return c.values[id], nil
 }
 
-func (c *MemoryChain) Next(id int) ([]Link, error) {
+func (c *MemoryChain) Links(id int) ([]Link, error) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 

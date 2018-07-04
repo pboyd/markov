@@ -25,7 +25,7 @@ func testReadWriteChain(t *testing.T, chain ReadWriteChain) {
 		t.Errorf(`got %q, want " "`, string(actual.(rune)))
 	}
 
-	p, err := chain.Next(spaceID)
+	links, err := chain.Links(spaceID)
 	if err != nil {
 		t.Fatalf("got error: %v", err)
 	}
@@ -35,7 +35,7 @@ func testReadWriteChain(t *testing.T, chain ReadWriteChain) {
 		t.Fatalf("got error: %v", err)
 	}
 
-	for _, l := range p {
+	for _, l := range links {
 		if l.ID == aID {
 			// 88 words in the paragraph. 10 of which start with "a".
 			expectedPA := float64(10 / 88)

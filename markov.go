@@ -10,7 +10,7 @@ var (
 // Chain is a read-only Markov chain.
 type Chain interface {
 	Get(id int) (Value, error)
-	Next(id int) ([]Link, error)
+	Links(id int) ([]Link, error)
 	Find(Value) (id int, err error)
 	Len() (int, error)
 }
