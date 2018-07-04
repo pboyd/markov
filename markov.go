@@ -2,7 +2,10 @@ package markov
 
 import "errors"
 
-var ErrNotFound error = errors.New("markov: not found")
+var (
+	ErrNotFound    error = errors.New("markov: not found")
+	ErrBrokenChain error = errors.New("markov: broken chain")
+)
 
 // Chain is a read-only Markov chain.
 type Chain interface {
