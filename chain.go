@@ -12,6 +12,19 @@ func NewChain() *Chain {
 	}
 }
 
+func (c *Chain) RandomNode() *Node {
+	r := rand.Intn(len(c.nodes))
+	i := 0
+	for _, n := range c.nodes {
+		if i == r {
+			return n
+		}
+		i++
+	}
+
+	return nil
+}
+
 func (c *Chain) GetNode(value interface{}) *Node {
 	node, ok := c.nodes[value]
 	if !ok {
