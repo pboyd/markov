@@ -2,6 +2,7 @@ package disk
 
 import (
 	"encoding/binary"
+	"io"
 	"os"
 )
 
@@ -110,4 +111,64 @@ func (r *Record) Value() []byte {
 	start := sectionHeaderLength + recordHeaderLength
 	end := start + int(r.valueLength())
 	return r.buf[start:end]
+}
+
+// RecordReader iterates through the records in a file.
+type RecordReader struct {
+	file            *os.File
+	nextOffset      int64
+	listElementSize uint16
+}
+
+// NewRecordReader creates a RecordReader. startOffset must the offset of a
+// record. listElementSize is passed through to ReadRecord.
+func NewRecordReader(file *os.File, startOffset int64, listElementSize uint16) *RecordReader {
+	return &RecordReader{
+		file:            file,
+		nextOffset:      startOffset,
+		listElementSize: listElementSize,
+	}
+}
+
+// Read returns the next Record. It returns io.EOF when there are no more
+// records.
+func (rr *RecordReader) Read() (*Record, error) {
+	if rr.nextOffset < 0 {
+		return nil, io.EOF
+	}
+
+	r, err := ReadRecord(rr.file, rr.nextOffset, rr.listElementSize)
+	if err != nil {
+		return nil, err
+	}
+
+	rr.nextOffset, err = rr.findNext(rr.nextOffset)
+	if err != nil {
+		return r, err
+	}
+
+	return r, nil
+}
+
+func (rr *RecordReader) findNext(offset int64) (int64, error) {
+	buf := make([]byte, sectionHeaderLength)
+	first := true
+	for {
+		_, err := rr.file.ReadAt(buf, offset)
+		if err == io.EOF {
+			return -1, nil
+		}
+
+		if err != nil {
+			return 0, nil
+		}
+
+		t, len := sectionHeader(buf)
+		if !first && t == recordSection {
+			return offset, nil
+		}
+
+		offset += sectionHeaderLength + int64(len)
+		first = false
+	}
 }
