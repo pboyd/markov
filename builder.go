@@ -2,43 +2,67 @@ package markov
 
 import "sync"
 
-func Feed(wc WriteChain, chans ...<-chan interface{}) {
+// Feed reads values from the channels and writes them to the WriteChain.
+//
+// Blocks until all the channels have been closed.
+//
+// If the WriteChain returns an error Feed returns it immediately, leaving
+// unread values on the channels.
+func Feed(wc WriteChain, channels ...<-chan interface{}) error {
 	var wg sync.WaitGroup
-	wg.Add(len(chans))
+	wg.Add(len(channels))
 
-	for _, ch := range chans {
+	cancel := make(chan struct{})
+	errChannel := make(chan error, len(channels))
+
+	for _, ch := range channels {
 		go func(values <-chan interface{}) {
 			defer wg.Done()
-			feedOne(wc, values)
+			errChannel <- feedOne(cancel, wc, values)
 		}(ch)
 	}
 
 	wg.Wait()
+
+	close(errChannel)
+	for err := range errChannel {
+		return err
+	}
+
+	return nil
 }
 
-func feedOne(wc WriteChain, values <-chan interface{}) {
+func feedOne(cancel chan struct{}, wc WriteChain, values <-chan interface{}) error {
 	var next int
 	var err error
 
 	last, err := wc.Add(<-values)
 	if err != nil {
-		// FIXME
-		panic(err)
+		return err
 	}
 
-	for val := range values {
-		next, err = wc.Add(val)
-		if err != nil {
-			// FIXME
-			panic(err)
-		}
+	for {
+		select {
+		case <-cancel:
+			return nil
+		case val, ok := <-values:
+			if !ok {
+				return nil
+			}
 
-		err = wc.Relate(last, next, 1)
-		if err != nil {
-			// FIXME
-			panic(err)
-		}
+			next, err = wc.Add(val)
+			if err != nil {
+				return err
+			}
 
-		last = next
+			err = wc.Relate(last, next, 1)
+			if err != nil {
+				return err
+			}
+
+			last = next
+		}
 	}
+
+	return nil
 }
