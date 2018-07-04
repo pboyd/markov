@@ -1,7 +1,10 @@
 package markov
 
 import (
+	"bytes"
 	"encoding/binary"
+	"errors"
+	"io"
 	"os"
 
 	"github.com/pboyd/markov/internal/disk"
@@ -31,6 +34,34 @@ func NewDiskChainWriter(w *os.File) (*DiskChainWriter, error) {
 		file:  w,
 		index: make(map[interface{}]int64),
 	}, nil
+}
+
+func OpenDiskChainWriter(w *os.File) (*DiskChainWriter, error) {
+	err := verifyDiskHeader(w)
+	if err != nil {
+		return nil, err
+	}
+
+	c := &DiskChainWriter{
+		file:  w,
+		index: make(map[interface{}]int64),
+	}
+
+	return c, c.buildIndex()
+}
+
+func verifyDiskHeader(w *os.File) error {
+	actualHeader := make([]byte, len(diskHeader))
+	_, err := w.ReadAt(actualHeader, 0)
+	if err != nil {
+		return err
+	}
+
+	if !bytes.Equal(actualHeader, []byte(diskHeader)) {
+		return errors.New("markov: unrecognized file")
+	}
+
+	return nil
 }
 
 func (c *DiskChainWriter) Get(id int) (interface{}, error) {
@@ -162,4 +193,25 @@ func (c *DiskChainWriter) packLinkValue(id int, count uint32) []byte {
 
 func (c *DiskChainWriter) updateLinkCount(buf []byte, count uint32) {
 	binary.BigEndian.PutUint32(buf[8:], count)
+}
+
+func (c *DiskChainWriter) buildIndex() error {
+	rr := disk.NewRecordReader(c.file, int64(len(diskHeader)), linkListItemSize)
+	for {
+		record, err := rr.Read()
+		if err != nil {
+			if err == io.EOF {
+				return nil
+			}
+			return err
+		}
+
+		value, err := unmarshalValue(record.Value())
+		if err != nil {
+			// FIXME? Is this really fatal?
+			return err
+		}
+
+		c.index[value] = record.Offset
+	}
 }

@@ -36,6 +36,13 @@ func TestDiskChainWriter(t *testing.T) {
 	}
 
 	testReadWriteChain(t, writer)
+
+	writer2, err := OpenDiskChainWriter(f)
+	if err != nil {
+		t.Fatalf("OpenDiskChainWriter failed: %v", err)
+	}
+
+	testReadChain(t, writer2)
 }
 
 func TestDiskChain(t *testing.T) {
@@ -49,12 +56,10 @@ func TestDiskChain(t *testing.T) {
 
 	testWriteChain(t, writer)
 
-	/*
-		reader, err := NewDiskChain(f)
-		if err != nil {
-			t.Fatalf("NewDiskChain failed: %v", err)
-		}
+	reader, err := ReadDiskChain(f)
+	if err != nil {
+		t.Fatalf("NewDiskChain failed: %v", err)
+	}
 
-		testReadChain(t, reader)
-	*/
+	testReadChain(t, reader)
 }
