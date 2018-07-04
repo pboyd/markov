@@ -1,25 +1,44 @@
 package markov
 
-type Builder struct {
-	initial interface{}
-	Chain   *MemoryChain
-}
+import "sync"
 
-func NewBuilder(initial interface{}) *Builder {
-	return &Builder{
-		initial: initial,
-		Chain:   NewChain(),
+func Feed(wc WriteChain, chans ...<-chan Value) {
+	var wg sync.WaitGroup
+	wg.Add(len(chans))
+
+	for _, ch := range chans {
+		go func(values <-chan Value) {
+			defer wg.Done()
+			feedOne(wc, values)
+		}(ch)
 	}
+
+	wg.Wait()
 }
 
-func (b *Builder) Root() *MemoryNode {
-	return b.Chain.Get(b.initial)
-}
+func feedOne(wc WriteChain, values <-chan Value) {
+	var next int
+	var err error
 
-func (b *Builder) Feed(values <-chan interface{}) {
-	last := b.Chain.Get(b.initial)
+	last, err := wc.Add(<-values)
+	if err != nil {
+		// FIXME
+		panic(err)
+	}
 
 	for val := range values {
-		last = last.Mark(val)
+		next, err = wc.Add(val)
+		if err != nil {
+			// FIXME
+			panic(err)
+		}
+
+		err = wc.Relate(last, next, 1)
+		if err != nil {
+			// FIXME
+			panic(err)
+		}
+
+		last = next
 	}
 }

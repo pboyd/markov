@@ -1,102 +1,122 @@
 package markov
 
-import "math/rand"
+import "sync"
+
+var _ Chain = &MemoryChain{}
 
 type MemoryChain struct {
-	nodes map[interface{}]*MemoryNode
+	mu     sync.RWMutex
+	values []Value
+	links  []linkCountSlice
 }
 
-func NewChain() *MemoryChain {
-	return &MemoryChain{
-		nodes: map[interface{}]*MemoryNode{},
+func (c *MemoryChain) Get(id int) (Value, error) {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	if id >= len(c.values) {
+		return nil, nil
 	}
+
+	return c.values[id], nil
 }
 
-func (c *MemoryChain) Get(value interface{}) *MemoryNode {
-	node, ok := c.nodes[value]
-	if !ok {
-		node = &MemoryNode{
-			Value:    value,
-			chain:    c,
-			children: []*memoryChildNode{},
-		}
-		c.nodes[value] = node
+func (c *MemoryChain) Next(id int) ([]Link, error) {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	if id >= len(c.links) {
+		return nil, ErrNotFound
 	}
-	return node
+
+	return c.links[id].LinkSlice(), nil
 }
 
-type MemoryNode struct {
-	Value    interface{}
-	chain    *MemoryChain
-	children []*memoryChildNode
-}
+func (c *MemoryChain) Find(value Value) (int, error) {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
 
-type memoryChildNode struct {
-	*MemoryNode
-	Count int
-}
-
-func (n *MemoryNode) findChild(value interface{}) *memoryChildNode {
-	for _, child := range n.children {
-		if child.Value == value {
-			return child
+	for i, test := range c.values {
+		if value == test {
+			return i, nil
 		}
 	}
+
+	return 0, ErrNotFound
+}
+
+func (c *MemoryChain) Len() (int, error) {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	return len(c.values), nil
+}
+
+func (c *MemoryChain) Add(value Value) (int, error) {
+	existing, err := c.Find(value)
+	if err == nil {
+		return existing, nil
+	}
+
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	c.values = append(c.values, value)
+	c.links = append(c.links, make(linkCountSlice, 0, 1))
+
+	return len(c.values) - 1, nil
+}
+
+func (c *MemoryChain) Relate(parent, child int, delta int) error {
+	childIndex := c.links[parent].Find(child)
+	if childIndex < 0 {
+		c.links[parent] = append(c.links[parent], linkCount{ID: child})
+		childIndex = len(c.links[parent]) - 1
+	}
+
+	c.links[parent][childIndex].Count += delta
 
 	return nil
 }
 
-func (n *MemoryNode) Mark(value interface{}) *MemoryNode {
-	child := n.chain.Get(value)
-
-	cn := n.findChild(child.Value)
-	if cn == nil {
-		cn = &memoryChildNode{
-			MemoryNode: child,
-		}
-		n.children = append(n.children, cn)
-	}
-
-	cn.Count++
-
-	return child
+type linkCount struct {
+	ID    int
+	Count int
 }
 
-func (n *MemoryNode) sum() int {
-	total := 0
-	for _, c := range n.children {
-		total += c.Count
+func (l *linkCount) Link(total int) Link {
+	return Link{
+		ID:          l.ID,
+		Probability: float64(l.Count) / float64(total),
 	}
+}
 
+type linkCountSlice []linkCount
+
+func (ls linkCountSlice) sum() int {
+	total := 0
+	for _, l := range ls {
+		total += l.Count
+	}
 	return total
 }
 
-func (n *MemoryNode) Probabilities() map[interface{}]float64 {
-	total := float64(n.sum())
-	p := make(map[interface{}]float64, len(n.children))
+func (ls linkCountSlice) LinkSlice() []Link {
+	total := ls.sum()
 
-	for _, child := range n.children {
-		p[child.Value] = float64(child.Count) / total
+	links := make([]Link, len(ls))
+	for i, l := range ls {
+		links[i] = l.Link(total)
 	}
 
-	return p
+	return links
 }
 
-func (n *MemoryNode) Next() *MemoryNode {
-	if len(n.children) == 0 {
-		// This happens if the chain ends
-		return nil
-	}
-
-	index := rand.Intn(n.sum())
-	passed := 0
-
-	for _, child := range n.children {
-		passed += child.Count
-		if passed > index {
-			return child.MemoryNode
+func (ls linkCountSlice) Find(id int) int {
+	for i, l := range ls {
+		if l.ID == id {
+			return i
 		}
 	}
-
-	panic("Next() failed")
+	return -1
 }

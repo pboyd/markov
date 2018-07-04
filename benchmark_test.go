@@ -1,10 +1,6 @@
 package markov
 
-import (
-	"math/rand"
-	"testing"
-)
-
+/*
 func BenchmarkBuildUnique(b *testing.B) {
 	numbers := normalDistGenerator(b.N, b.N*2)
 	NewBuilder(0).Feed(numbers)
@@ -40,3 +36,4 @@ func normalDistGenerator(count, stddev int) <-chan interface{} {
 
 	return numbers
 }
+*/
