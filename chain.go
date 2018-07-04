@@ -96,6 +96,11 @@ func (n *Node) Probabilities() map[interface{}]float64 {
 }
 
 func (n *Node) Next() *Node {
+	if len(n.children) == 0 {
+		// This happens if the chain ends
+		return nil
+	}
+
 	index := rand.Intn(n.sum())
 	passed := 0
 
