@@ -2,21 +2,38 @@ package markov
 
 import "math/rand"
 
+type Chain struct {
+	nodes map[interface{}]*Node
+}
+
+func NewChain() *Chain {
+	return &Chain{
+		nodes: map[interface{}]*Node{},
+	}
+}
+
+func (c *Chain) GetNode(value interface{}) *Node {
+	node, ok := c.nodes[value]
+	if !ok {
+		node = &Node{
+			Value:    value,
+			chain:    c,
+			children: []*childNode{},
+		}
+		c.nodes[value] = node
+	}
+	return node
+}
+
 type Node struct {
 	Value    interface{}
+	chain    *Chain
 	children []*childNode
 }
 
 type childNode struct {
 	*Node
 	Count int
-}
-
-func NewNode(value interface{}) *Node {
-	return &Node{
-		Value:    value,
-		children: []*childNode{},
-	}
 }
 
 func (n *Node) findChild(value interface{}) *childNode {
@@ -29,7 +46,9 @@ func (n *Node) findChild(value interface{}) *childNode {
 	return nil
 }
 
-func (n *Node) Mark(child *Node) {
+func (n *Node) Mark(value interface{}) *Node {
+	child := n.chain.GetNode(value)
+
 	cn := n.findChild(child.Value)
 	if cn == nil {
 		cn = &childNode{
@@ -39,6 +58,8 @@ func (n *Node) Mark(child *Node) {
 	}
 
 	cn.Count++
+
+	return child
 }
 
 func (n *Node) sum() int {
