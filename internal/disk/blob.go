@@ -24,7 +24,7 @@ func (f *File) WriteBlob(offset int64, buf []byte) (int64, error) {
 		return 0, err
 	}
 
-	_, err = f.Write(startOffset+int64(len(size)), buf)
+	_, err = f.rw.Write(buf)
 	return startOffset, err
 }
 
@@ -44,7 +44,7 @@ func (f *File) OverwriteBlob(offset int64, buf []byte) error {
 		return errors.New("OverwriteBlob size mismatch")
 	}
 
-	_, err = f.WriteBlob(offset, buf)
+	_, err = f.rw.Write(buf)
 	return err
 }
 
@@ -63,5 +63,5 @@ func (f *File) ReadBlob(offset int64) ([]byte, error) {
 		return nil, err
 	}
 
-	return f.Read(offset+BlobHeaderLength, int64(size))
+	return f.readNext(int64(size))
 }

@@ -24,11 +24,7 @@ func TestBinTree(t *testing.T) {
 			t.Fatalf("got error %v, want nil", err)
 		}
 
-		actual, err := n.Value()
-		if err != nil {
-			t.Fatalf("got error %v, want nil", err)
-		}
-
+		actual := n.Value()
 		if actual != c.value {
 			t.Errorf("got %d, want %d", actual, c.value)
 		}
@@ -45,11 +41,7 @@ func TestBinTree(t *testing.T) {
 			continue
 		}
 
-		value, err := node.Value()
-		if err != nil {
-			t.Errorf("got error %v, want nil", err)
-		}
-
+		value := node.Value()
 		if value != c.value {
 			t.Errorf("got %d, want %d", value, c.value)
 		}

@@ -89,12 +89,12 @@ func (c *DiskChainWriter) Find(value interface{}) (int, error) {
 		return 0, err
 	}
 
-	return c.findByRawKey(valueBuf)
-}
+	root, err := disk.ReadBinaryTree(c.file, indexOffset)
+	if err != nil {
+		return 0, err
+	}
 
-func (c *DiskChainWriter) findByRawKey(value []byte) (int, error) {
-	root := disk.ReadBinaryTree(c.file, indexOffset)
-	node, err := root.Search(value)
+	node, err := root.Search(valueBuf)
 	if err != nil {
 		return 0, err
 	}
@@ -103,11 +103,7 @@ func (c *DiskChainWriter) findByRawKey(value []byte) (int, error) {
 		return 0, ErrNotFound
 	}
 
-	id, err := node.Value()
-	if id == 0 {
-		panic(node.Offset)
-	}
-	return int(id), err
+	return int(node.Value()), nil
 }
 
 func (c *DiskChainWriter) Add(value interface{}) (int, error) {
@@ -116,13 +112,12 @@ func (c *DiskChainWriter) Add(value interface{}) (int, error) {
 		return 0, err
 	}
 
-	existing, err := c.findByRawKey(valueBuf)
-	if err == nil {
-		return existing, nil
-	}
-
 	indexNode, err := c.createIndexEntry(valueBuf)
 	if err != nil {
+		if err == disk.ErrDuplicate {
+			return int(indexNode.Value()), nil
+		}
+
 		return 0, err
 	}
 
@@ -131,7 +126,8 @@ func (c *DiskChainWriter) Add(value interface{}) (int, error) {
 		return 0, err
 	}
 
-	err = indexNode.SetValue(id)
+	indexNode.SetValue(id)
+	err = indexNode.Write()
 	if err != nil {
 		return 0, err
 	}
@@ -210,7 +206,7 @@ func (c *DiskChainWriter) createIndexEntry(key []byte) (*disk.BinaryTreeNode, er
 	if !c.indexCreated {
 		root := disk.NewBinaryTree(c.file)
 		c.indexCreated = true
-		_, err := root.Insert(key, 0)
+		root, err := root.Insert(key, 0)
 
 		if root.Offset != indexOffset {
 			panic("index at wrong location")
@@ -219,6 +215,9 @@ func (c *DiskChainWriter) createIndexEntry(key []byte) (*disk.BinaryTreeNode, er
 		return root, err
 	}
 
-	bst := disk.ReadBinaryTree(c.file, indexOffset)
+	bst, err := disk.ReadBinaryTree(c.file, indexOffset)
+	if err != nil {
+		return nil, err
+	}
 	return bst.Insert(key, 0)
 }

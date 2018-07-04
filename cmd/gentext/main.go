@@ -39,8 +39,19 @@ func main() {
 		os.Exit(1)
 	}
 
-	chain := &markov.MemoryChain{}
+	//chain := &markov.MemoryChain{}
+	f, err := os.Create("chain")
+	if err != nil {
+		panic(err)
+	}
+	defer f.Close()
+	chain, err := markov.NewDiskChainWriter(f)
+	if err != nil {
+		panic(err)
+	}
 	markov.Feed(chain, words)
+
+	fmt.Printf("build done")
 
 	walker := markov.RandomWalker(chain, 0)
 

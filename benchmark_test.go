@@ -13,6 +13,32 @@ func BenchmarkBuildDuplicate(b *testing.B) {
 	Feed(NewMemoryChain(b.N), normalDistGenerator(b.N, 10))
 }
 
+func BenchmarkBuildUniqueDisk(b *testing.B) {
+	f, cleanup := tempFile(b)
+	defer cleanup()
+
+	chain, err := NewDiskChainWriter(f)
+	if err != nil {
+		b.Fatalf("error: %v", err)
+	}
+	b.ResetTimer()
+
+	Feed(chain, normalDistGenerator(b.N, b.N*2))
+}
+
+func BenchmarkBuildDuplicateDisk(b *testing.B) {
+	f, cleanup := tempFile(b)
+	defer cleanup()
+
+	chain, err := NewDiskChainWriter(f)
+	if err != nil {
+		b.Fatalf("error: %v", err)
+	}
+	b.ResetTimer()
+
+	Feed(chain, normalDistGenerator(b.N, 10))
+}
+
 func BenchmarkRandomWalk(b *testing.B) {
 	chain := NewMemoryChain(b.N)
 	Feed(chain, normalDistGenerator(b.N, b.N/4))

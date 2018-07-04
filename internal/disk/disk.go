@@ -53,6 +53,13 @@ func (f *File) Read(offset, length int64) ([]byte, error) {
 	return buf[:n], err
 }
 
+func (f *File) readNext(length int64) ([]byte, error) {
+	buf := make([]byte, length)
+	n, err := io.ReadFull(f.rw, buf)
+
+	return buf[:n], err
+}
+
 func (f *File) writeAddress(offset, address int64) (int64, error) {
 	buf := make([]byte, addressLength)
 	binary.BigEndian.PutUint64(buf, uint64(address))

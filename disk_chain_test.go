@@ -9,7 +9,7 @@ import (
 	"time"
 )
 
-func tempFile(t *testing.T) (io.ReadWriteSeeker, func()) {
+func tempFile(t testing.TB) (io.ReadWriteSeeker, func()) {
 	path := filepath.Join(
 		os.TempDir(),
 		strconv.Itoa(int(time.Now().UnixNano())),
