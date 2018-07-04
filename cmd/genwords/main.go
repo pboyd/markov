@@ -8,6 +8,7 @@ import (
 	"log"
 	"math/rand"
 	"os"
+	"sync"
 	"unicode"
 
 	"github.com/pboyd/markov"
@@ -32,8 +33,7 @@ func main() {
 	}
 	rand.Seed(int64(seed))
 
-	b := markov.NewBuilder(' ')
-	runes, err := readRunes(source)
+	letters, lengths, err := readFile(source)
 	if err != nil {
 		fmt.Printf("file error (%s): %v\n", source, err)
 		os.Exit(1)
@@ -41,39 +41,61 @@ func main() {
 
 	log.Printf("seed=%d", seed)
 
-	b.Feed(runes)
-	node := b.Root()
+	var letterNode, lengthNode *markov.Node
 
-	generated := 0
-	for {
-		node = node.Next()
-		r := node.Value.(rune)
-		fmt.Print(string(r))
+	wg := sync.WaitGroup{}
+	wg.Add(2)
+	go func() {
+		b := markov.NewBuilder(' ')
+		b.Feed(letters)
+		letterNode = b.Root()
+		wg.Done()
+	}()
 
-		if r == ' ' {
-			generated++
-			if generated == wordCount {
-				break
-			}
+	go func() {
+		b := markov.NewBuilder(0)
+		b.Feed(lengths)
+		lengthNode = b.Root()
+		wg.Done()
+	}()
+
+	wg.Wait()
+
+	for generated := 0; generated < wordCount; generated++ {
+		lengthNode = lengthNode.Next()
+		length := lengthNode.Value.(int)
+
+		for i := 0; i < length; i++ {
+			letterNode = letterNode.Next()
+			r := letterNode.Value.(rune)
+			fmt.Print(string(r))
 		}
+
+		fmt.Print(" ")
 	}
 
 	fmt.Print("\n")
 }
 
-func readRunes(path string) (<-chan interface{}, error) {
+func readFile(path string) (<-chan interface{}, <-chan interface{}, error) {
 	fh, err := os.Open(path)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	reader := bufio.NewReader(fh)
 
-	runes := make(chan interface{})
+	letters := make(chan interface{})
+	lengths := make(chan interface{})
 
 	go func() {
-		defer fh.Close()
-		defer close(runes)
+		defer func() {
+			fh.Close()
+			close(letters)
+			close(lengths)
+		}()
+
+		wordLength := 0
 
 		for {
 			r, _, err := reader.ReadRune()
@@ -84,11 +106,20 @@ func readRunes(path string) (<-chan interface{}, error) {
 				break
 			}
 
-			if unicode.IsLetter(r) || r == ' ' {
-				runes <- unicode.ToLower(r)
+			if unicode.IsSpace(r) {
+				if wordLength > 0 {
+					lengths <- wordLength
+					wordLength = 0
+				}
+			} else {
+				wordLength++
+			}
+
+			if unicode.IsLetter(r) {
+				letters <- unicode.ToLower(r)
 			}
 		}
 	}()
 
-	return runes, nil
+	return letters, lengths, nil
 }
