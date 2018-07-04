@@ -5,9 +5,18 @@ import "sync"
 var _ Chain = &MemoryChain{}
 
 type MemoryChain struct {
-	mu     sync.RWMutex
-	values []Value
-	links  []linkCountSlice
+	mu         sync.RWMutex
+	valueIndex map[Value]int
+	values     []Value
+	links      []linkCountSlice
+}
+
+func NewMemoryChain(cap int) *MemoryChain {
+	return &MemoryChain{
+		valueIndex: make(map[Value]int, cap),
+		values:     make([]Value, 0, cap),
+		links:      make([]linkCountSlice, 0, cap),
+	}
 }
 
 func (c *MemoryChain) Get(id int) (Value, error) {
@@ -36,13 +45,13 @@ func (c *MemoryChain) Find(value Value) (int, error) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 
-	for i, test := range c.values {
-		if value == test {
-			return i, nil
-		}
+	id, ok := c.valueIndex[value]
+
+	if !ok {
+		return 0, ErrNotFound
 	}
 
-	return 0, ErrNotFound
+	return id, nil
 }
 
 func (c *MemoryChain) Len() (int, error) {
@@ -64,7 +73,14 @@ func (c *MemoryChain) Add(value Value) (int, error) {
 	c.values = append(c.values, value)
 	c.links = append(c.links, make(linkCountSlice, 0, 1))
 
-	return len(c.values) - 1, nil
+	if c.valueIndex == nil {
+		c.valueIndex = map[Value]int{}
+	}
+
+	id := len(c.values) - 1
+	c.valueIndex[value] = id
+
+	return id, nil
 }
 
 func (c *MemoryChain) Relate(parent, child int, delta int) error {

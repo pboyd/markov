@@ -1,29 +1,32 @@
 package markov
 
-/*
+import (
+	"math/rand"
+	"testing"
+)
+
 func BenchmarkBuildUnique(b *testing.B) {
-	numbers := normalDistGenerator(b.N, b.N*2)
-	NewBuilder(0).Feed(numbers)
+	Feed(NewMemoryChain(b.N), normalDistGenerator(b.N, b.N*2))
 }
 
 func BenchmarkBuildDuplicate(b *testing.B) {
-	numbers := normalDistGenerator(b.N, 10)
-	NewBuilder(0).Feed(numbers)
+	Feed(NewMemoryChain(b.N), normalDistGenerator(b.N, 10))
 }
 
-func BenchmarkNext(b *testing.B) {
-	builder := NewBuilder(0)
-	builder.Feed(normalDistGenerator(b.N, b.N/4))
-	node := builder.Root()
+func BenchmarkRandomWalk(b *testing.B) {
+	chain := NewMemoryChain(b.N)
+	Feed(chain, normalDistGenerator(b.N, b.N/4))
+	walker := NewRandomWalker(chain, 0)
+
 	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
-		node = node.Next()
+		walker.Next()
 	}
 }
 
-func normalDistGenerator(count, stddev int) <-chan interface{} {
-	numbers := make(chan interface{})
+func normalDistGenerator(count, stddev int) <-chan Value {
+	numbers := make(chan Value)
 
 	go func() {
 		defer close(numbers)
@@ -36,4 +39,3 @@ func normalDistGenerator(count, stddev int) <-chan interface{} {
 
 	return numbers
 }
-*/
