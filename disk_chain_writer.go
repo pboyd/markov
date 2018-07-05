@@ -19,40 +19,50 @@ const (
 	linkListItemsPerBucket = 64
 )
 
+// DiskChainWriter is a ReadWriteChain stored in a file.
 type DiskChainWriter struct {
 	file  *os.File
 	index map[interface{}]int64
 }
 
-func NewDiskChainWriter(w *os.File) (*DiskChainWriter, error) {
-	_, err := w.Write([]byte(diskHeader))
+// NewDiskChainWriter creates a new DiskChainWriter. File must be writable. Any
+// existing data in the file will be lost.
+func NewDiskChainWriter(file *os.File) (*DiskChainWriter, error) {
+	err := file.Truncate(0)
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = file.WriteAt([]byte(diskHeader), 0)
 	if err != nil {
 		return nil, err
 	}
 
 	return &DiskChainWriter{
-		file:  w,
+		file:  file,
 		index: make(map[interface{}]int64),
 	}, nil
 }
 
-func OpenDiskChainWriter(w *os.File) (*DiskChainWriter, error) {
-	err := verifyDiskHeader(w)
+// OpenDiskChainWriter reads an existing disk chain. If file is a read/write
+// handle the disk chain can be updated.
+func OpenDiskChainWriter(file *os.File) (*DiskChainWriter, error) {
+	err := verifyDiskHeader(file)
 	if err != nil {
 		return nil, err
 	}
 
 	c := &DiskChainWriter{
-		file:  w,
+		file:  file,
 		index: make(map[interface{}]int64),
 	}
 
 	return c, c.buildIndex()
 }
 
-func verifyDiskHeader(w *os.File) error {
+func verifyDiskHeader(file *os.File) error {
 	actualHeader := make([]byte, len(diskHeader))
-	_, err := w.ReadAt(actualHeader, 0)
+	_, err := file.ReadAt(actualHeader, 0)
 	if err != nil {
 		return err
 	}
