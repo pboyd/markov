@@ -16,7 +16,7 @@ const (
 	diskHeader = "MKV\u0001"
 
 	linkListItemSize       = 12
-	linkListItemsPerBucket = 64
+	linkListItemsPerBucket = 128
 )
 
 // DiskChainWriter is a ReadWriteChain stored in a file.
@@ -75,6 +75,10 @@ func verifyDiskHeader(file *os.File) error {
 }
 
 func (c *DiskChainWriter) Get(id int) (interface{}, error) {
+	if id == 0 {
+		id = len(diskHeader)
+	}
+
 	record, err := disk.ReadRecord(c.file, int64(id), linkListItemSize)
 	if err != nil {
 		return nil, err
@@ -224,4 +228,18 @@ func (c *DiskChainWriter) buildIndex() error {
 
 		c.index[value] = record.Offset
 	}
+}
+
+func (c *DiskChainWriter) Next(id int) (int, error) {
+	rr := disk.NewRecordReader(c.file, int64(id), linkListItemSize)
+	next, err := rr.Next()
+	if err == io.EOF {
+		return 0, ErrBrokenChain
+	}
+
+	if err != nil {
+		return 0, err
+	}
+
+	return int(next), nil
 }

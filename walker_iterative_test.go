@@ -43,6 +43,21 @@ func BenchmarkMemoryChainIterator(b *testing.B) {
 	benchmarkIterativeWalker(b, chain)
 }
 
+func BenchmarkDiskChainIterator(b *testing.B) {
+	f, cleanup := tempFile(b)
+	defer cleanup()
+
+	chain, err := NewDiskChainWriter(f)
+	if err != nil {
+		b.Fatalf("error: %v", err)
+	}
+
+	Feed(chain, split(testText))
+	b.ResetTimer()
+
+	benchmarkIterativeWalker(b, chain)
+}
+
 func benchmarkIterativeWalker(b *testing.B, chain Chain) {
 	for i := 0; i < b.N; i++ {
 		walker := IterativeWalker(chain)

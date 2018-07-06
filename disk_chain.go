@@ -30,3 +30,7 @@ func (c *DiskChain) Links(id int) ([]Link, error) {
 func (c *DiskChain) Find(value interface{}) (id int, err error) {
 	return c.w.Find(value)
 }
+
+func (c *DiskChain) Next(id int) (int, error) {
+	return c.w.Next(id)
+}

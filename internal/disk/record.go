@@ -13,6 +13,7 @@ type Record struct {
 	buf    []byte
 }
 
+// NewRecord appends a new record at the end of file.
 func NewRecord(file *os.File, value []byte, listElementSize uint16, listBucketLen uint16) (*Record, error) {
 	size := sectionHeaderLength + recordHeaderLength + len(value)
 	size += ListBucketSize(listElementSize, listBucketLen)
@@ -47,6 +48,7 @@ func NewRecord(file *os.File, value []byte, listElementSize uint16, listBucketLe
 	return r, nil
 }
 
+// ReadRecord reads a record from file at the given offset.
 func ReadRecord(file *os.File, offset int64, listElementSize uint16) (*Record, error) {
 	r := &Record{
 		Offset: offset,
@@ -142,33 +144,38 @@ func (rr *RecordReader) Read() (*Record, error) {
 		return nil, err
 	}
 
-	rr.nextOffset, err = rr.findNext(rr.nextOffset)
+	_, err = rr.Next()
 	if err != nil {
+		if err == io.EOF {
+			rr.nextOffset = -1
+			err = nil
+		}
+
 		return r, err
 	}
 
 	return r, nil
 }
 
-func (rr *RecordReader) findNext(offset int64) (int64, error) {
+func (rr *RecordReader) Next() (int64, error) {
+	if rr.nextOffset < 0 {
+		return 0, io.EOF
+	}
+
 	buf := make([]byte, sectionHeaderLength)
 	first := true
 	for {
-		_, err := rr.file.ReadAt(buf, offset)
-		if err == io.EOF {
-			return -1, nil
-		}
-
+		_, err := rr.file.ReadAt(buf, rr.nextOffset)
 		if err != nil {
-			return 0, nil
+			return 0, err
 		}
 
 		t, len := sectionHeader(buf)
 		if !first && t == recordSection {
-			return offset, nil
+			return rr.nextOffset, nil
 		}
 
-		offset += sectionHeaderLength + int64(len)
+		rr.nextOffset += sectionHeaderLength + int64(len)
 		first = false
 	}
 }
