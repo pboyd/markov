@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"io"
+	"math"
 	"os"
 
 	"github.com/pboyd/markov/internal/disk"
@@ -169,6 +170,10 @@ func (c *DiskChainWriter) Relate(parent, child int, delta int) error {
 
 		id, count := c.unpackLinkValue(value)
 		if id == child {
+			if int(count)+delta > math.MaxUint32 {
+				return errors.New("uint32 overflow")
+			}
+
 			count += uint32(delta)
 			c.updateLinkCount(value, count)
 			newChild = false
@@ -177,6 +182,10 @@ func (c *DiskChainWriter) Relate(parent, child int, delta int) error {
 	}
 
 	if newChild {
+		if delta > math.MaxUint32 {
+			return errors.New("uint32 overflow")
+		}
+
 		record.List.Append(c.packLinkValue(child, uint32(delta)))
 	}
 

@@ -50,8 +50,16 @@ func testReadChain(t *testing.T, chain Chain) {
 		t.Fatalf("got error: %v", err)
 	}
 
+	var foundA bool
+
 	for _, l := range links {
 		if l.ID == aID {
+			foundA = true
+
+			if math.IsNaN(l.Probability) {
+				t.Error("got probability of NaN")
+			}
+
 			// 88 words in the paragraph. 10 of which start with "a".
 			expectedPA := float64(10 / 88)
 			if math.Abs(l.Probability-expectedPA) < 0.001 {
@@ -60,6 +68,10 @@ func testReadChain(t *testing.T, chain Chain) {
 
 			break
 		}
+	}
+
+	if !foundA {
+		t.Error("never found A")
 	}
 }
 
