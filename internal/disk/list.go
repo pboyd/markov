@@ -246,8 +246,8 @@ func readListBucket(f *os.File, offset int64, elementSize, cap uint16) (*listBuc
 
 	size := elementSize*cap + offsetLength + recordHeaderLength
 
-	var err error
-	b.buf, err = Read(f, offset, int64(size))
+	b.buf = make([]byte, size)
+	_, err := f.ReadAt(b.buf, offset)
 	if err != nil {
 		return nil, err
 	}

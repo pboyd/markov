@@ -13,14 +13,12 @@ import (
 )
 
 var (
-	source string
 	output string
 	update bool
 	onDisk bool
 )
 
 func init() {
-	flag.StringVar(&source, "source", "", "path to the input text")
 	flag.StringVar(&output, "chain", "", "path the the output chain file")
 	flag.BoolVar(&update, "update", false, "if set update the output file instead of overwriting it")
 	flag.BoolVar(&onDisk, "disk", false, "if set write the chain directly to disk")
@@ -28,15 +26,26 @@ func init() {
 }
 
 func main() {
-	if source == "" || output == "" {
+	if output == "" {
 		flag.PrintDefaults()
 		os.Exit(1)
 	}
 
-	ngrams, err := readFile(source)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "file error (%s): %v\n", source, err)
+	sources := flag.Args()
+	if len(sources) == 0 {
+		fmt.Fprintf(os.Stderr, "usage: %s [flags] source [source]...\n", os.Args[0])
 		os.Exit(1)
+	}
+
+	ngrams := make([]<-chan interface{}, len(sources))
+
+	for i, source := range sources {
+		var err error
+		ngrams[i], err = readFile(source)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "file error (%s): %v\n", source, err)
+			os.Exit(1)
+		}
 	}
 
 	diskChain, err := openOutputFile(output, update)
@@ -46,14 +55,14 @@ func main() {
 	}
 
 	if onDisk {
-		err := markov.Feed(diskChain, ngrams)
+		err := markov.Feed(diskChain, ngrams...)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "error building chain: %v\n", err)
 			os.Exit(2)
 		}
 	} else {
 		memoryChain := &markov.MemoryChain{}
-		err := markov.Feed(memoryChain, ngrams)
+		err := markov.Feed(memoryChain, ngrams...)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "error building chain: %v\n", err)
 			os.Exit(2)

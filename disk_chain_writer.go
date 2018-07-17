@@ -7,6 +7,7 @@ import (
 	"io"
 	"math"
 	"os"
+	"sync"
 
 	"github.com/pboyd/markov/internal/disk"
 )
@@ -22,8 +23,11 @@ const (
 
 // DiskChainWriter is a ReadWriteChain stored in a file.
 type DiskChainWriter struct {
-	file  *os.File
-	index map[interface{}]int64
+	file           *os.File
+	fileWriteMutex sync.Mutex
+
+	index      map[interface{}]int64
+	indexMutex sync.RWMutex
 }
 
 // NewDiskChainWriter creates a new DiskChainWriter. File must be writable. Any
@@ -124,6 +128,9 @@ func (c *DiskChainWriter) Links(id int) ([]Link, error) {
 }
 
 func (c *DiskChainWriter) Find(value interface{}) (int, error) {
+	c.indexMutex.RLock()
+	defer c.indexMutex.RUnlock()
+
 	id, ok := c.index[value]
 	if !ok {
 		return 0, ErrNotFound
@@ -147,10 +154,16 @@ func (c *DiskChainWriter) add(value interface{}, bucketSize uint16) (int, error)
 		return 0, err
 	}
 
+	c.fileWriteMutex.Lock()
+	defer c.fileWriteMutex.Unlock()
+
 	record, err := disk.NewRecord(c.file, valueBuf, linkListItemSize, bucketSize)
 	if err != nil {
 		return 0, err
 	}
+
+	c.indexMutex.Lock()
+	defer c.indexMutex.Unlock()
 
 	c.index[value] = record.Offset
 
@@ -172,6 +185,9 @@ func (c *DiskChainWriter) Relate(parent, child int, delta int) error {
 }
 
 func (c *DiskChainWriter) relateToRecord(record *disk.Record, child, delta int) error {
+	c.fileWriteMutex.Lock()
+	defer c.fileWriteMutex.Unlock()
+
 	newChild := true
 
 	// Check for an existing entry
@@ -235,6 +251,9 @@ func (_ *DiskChainWriter) updateLinkCount(buf []byte, count uint32) {
 }
 
 func (c *DiskChainWriter) buildIndex() error {
+	c.indexMutex.Lock()
+	defer c.indexMutex.Unlock()
+
 	rr := disk.NewRecordReader(c.file, int64(len(diskHeader)), linkListItemSize)
 	for {
 		record, err := rr.Read()

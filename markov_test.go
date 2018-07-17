@@ -14,7 +14,7 @@ func testReadWriteChain(t *testing.T, chain ReadWriteChain) {
 }
 
 func testWriteChain(t *testing.T, chain WriteChain) {
-	err := Feed(chain, split(testText))
+	err := Feed(chain, split(testText), split(testText), split(testText))
 	if err != nil {
 		t.Errorf("got error: %v", err)
 	}
