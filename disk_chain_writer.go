@@ -133,6 +133,10 @@ func (c *DiskChainWriter) Find(value interface{}) (int, error) {
 }
 
 func (c *DiskChainWriter) Add(value interface{}) (int, error) {
+	return c.add(value, linkListItemsPerBucket)
+}
+
+func (c *DiskChainWriter) add(value interface{}, bucketSize uint16) (int, error) {
 	existing, err := c.Find(value)
 	if err == nil {
 		return existing, nil
@@ -143,7 +147,7 @@ func (c *DiskChainWriter) Add(value interface{}) (int, error) {
 		return 0, err
 	}
 
-	record, err := disk.NewRecord(c.file, valueBuf, linkListItemSize, linkListItemsPerBucket)
+	record, err := disk.NewRecord(c.file, valueBuf, linkListItemSize, bucketSize)
 	if err != nil {
 		return 0, err
 	}
@@ -159,6 +163,15 @@ func (c *DiskChainWriter) Relate(parent, child int, delta int) error {
 		return err
 	}
 
+	err = c.relateToRecord(record, child, delta)
+	if err != nil {
+		return err
+	}
+
+	return record.Write()
+}
+
+func (c *DiskChainWriter) relateToRecord(record *disk.Record, child, delta int) error {
 	newChild := true
 
 	// Check for an existing entry
@@ -186,10 +199,13 @@ func (c *DiskChainWriter) Relate(parent, child int, delta int) error {
 			return errors.New("uint32 overflow")
 		}
 
-		record.List.Append(c.packLinkValue(child, uint32(delta)))
+		err := record.List.Append(c.packLinkValue(child, uint32(delta)))
+		if err != nil {
+			return err
+		}
 	}
 
-	return record.Write()
+	return nil
 }
 
 func (c *DiskChainWriter) linkList(id int64) (*disk.List, error) {
@@ -214,7 +230,7 @@ func (c *DiskChainWriter) packLinkValue(id int, count uint32) []byte {
 	return buf
 }
 
-func (c *DiskChainWriter) updateLinkCount(buf []byte, count uint32) {
+func (_ *DiskChainWriter) updateLinkCount(buf []byte, count uint32) {
 	binary.BigEndian.PutUint32(buf[8:], count)
 }
 
@@ -251,4 +267,70 @@ func (c *DiskChainWriter) Next(id int) (int, error) {
 	}
 
 	return int(next), nil
+}
+
+func (dest *DiskChainWriter) CopyFrom(src Chain) error {
+	valueToDestID := make(map[interface{}]int)
+	srcIDtoDestID := make(map[int]int)
+
+	walker := IterativeWalker(src)
+	for {
+		value, err := walker.Next()
+		if err != nil {
+			if err == ErrBrokenChain {
+				break
+			}
+
+			return err
+		}
+
+		srcID, err := src.Find(value)
+		if err != nil {
+			return err
+		}
+
+		links, err := linkCounts(src, srcID)
+		if err != nil {
+			return err
+		}
+
+		destID, err := dest.add(value, uint16(len(links)))
+		if err != nil {
+			return err
+		}
+
+		valueToDestID[value] = destID
+		srcIDtoDestID[srcID] = destID
+	}
+
+	for value, destID := range valueToDestID {
+		srcID, err := src.Find(value)
+		if err != nil {
+			return err
+		}
+
+		linkCounts, err := linkCounts(src, srcID)
+		if err != nil {
+			return err
+		}
+
+		record, err := disk.ReadRecord(dest.file, int64(destID), linkListItemSize)
+		if err != nil {
+			return err
+		}
+
+		for _, link := range linkCounts {
+			err = dest.relateToRecord(record, srcIDtoDestID[link.ID], link.Count)
+			if err != nil {
+				return err
+			}
+		}
+
+		err = record.Write()
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }

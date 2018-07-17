@@ -99,6 +99,13 @@ func (c *MemoryChain) Next(last int) (int, error) {
 	return last + 1, nil
 }
 
+func (c *MemoryChain) linkCounts(id int) (linkCountSlice, error) {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	return c.links[id], nil
+}
+
 type linkCount struct {
 	ID    int
 	Count int
