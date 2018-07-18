@@ -16,12 +16,14 @@ var (
 	output string
 	update bool
 	onDisk bool
+	n      int
 )
 
 func init() {
 	flag.StringVar(&output, "chain", "", "path the the output chain file")
 	flag.BoolVar(&update, "update", false, "if set update the output file instead of overwriting it")
 	flag.BoolVar(&onDisk, "disk", false, "if set write the chain directly to disk")
+	flag.IntVar(&n, "n", 1, "ngram size")
 	flag.Parse()
 }
 
@@ -41,10 +43,14 @@ func main() {
 
 	for i, source := range sources {
 		var err error
-		ngrams[i], err = readFile(source)
+		ngrams[i], err = readFileByWord(source)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "file error (%s): %v\n", source, err)
 			os.Exit(1)
+		}
+
+		if n > 1 {
+			ngrams[i] = joinWords(ngrams[i], n)
 		}
 	}
 
@@ -114,7 +120,7 @@ func fileExists(path string) (bool, error) {
 	return false, err
 }
 
-func readFile(path string) (<-chan interface{}, error) {
+func readFileByWord(path string) (<-chan interface{}, error) {
 	fh, err := os.Open(path)
 	if err != nil {
 		return nil, err
@@ -145,7 +151,6 @@ func readFile(path string) (<-chan interface{}, error) {
 				word.WriteRune(r)
 			} else {
 				if word.Len() > 0 {
-					//fmt.Println(word.String())
 					words <- word.String()
 					word.Reset()
 				}
@@ -154,4 +159,31 @@ func readFile(path string) (<-chan interface{}, error) {
 	}()
 
 	return words, nil
+}
+
+func joinWords(words <-chan interface{}, n int) <-chan interface{} {
+	ngrams := make(chan interface{})
+
+	go func() {
+		defer close(ngrams)
+
+		ngram := make([]string, 0, n)
+
+		for word := range words {
+			sword := word.(string)
+
+			if len(ngram) < n {
+				ngram = append(ngram, sword)
+
+				if len(ngram) < n {
+					continue
+				}
+			} else {
+				copy(ngram[0:], ngram[1:])
+				ngram[n-1] = sword
+			}
+			ngrams <- strings.Join(ngram, " ")
+		}
+	}()
+	return ngrams
 }
