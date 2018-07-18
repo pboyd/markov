@@ -64,7 +64,7 @@ func TestDiskChain(t *testing.T) {
 	testReadChain(t, reader)
 }
 
-func TestDiskCopy(t *testing.T) {
+func TestMemoryToDiskCopy(t *testing.T) {
 	src := &MemoryChain{}
 	testWriteChain(t, src)
 
@@ -74,6 +74,38 @@ func TestDiskCopy(t *testing.T) {
 	dest, err := NewDiskChainWriter(f)
 	if err != nil {
 		t.Fatalf("error: %v", err)
+	}
+
+	err = Copy(dest, src)
+	if err != nil {
+		t.Fatalf("Copy failed with error: %v", err)
+	}
+
+	testReadChain(t, dest)
+}
+
+func TestDiskToDiskCopy(t *testing.T) {
+	f1, cleanup1 := tempFile(t)
+	defer cleanup1()
+
+	f2, cleanup2 := tempFile(t)
+	defer cleanup2()
+
+	writer, err := NewDiskChainWriter(f1)
+	if err != nil {
+		t.Fatalf("NewDiskChainWriter failed: %v", err)
+	}
+
+	testWriteChain(t, writer)
+
+	src, err := ReadDiskChain(f1)
+	if err != nil {
+		t.Fatalf("ReadDiskChain failed: %v", err)
+	}
+
+	dest, err := NewDiskChainWriter(f2)
+	if err != nil {
+		t.Fatalf("NewDiskChainWriter failed: %v", err)
 	}
 
 	err = Copy(dest, src)

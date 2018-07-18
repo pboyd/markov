@@ -275,6 +275,10 @@ func (c *DiskChainWriter) buildIndex() error {
 }
 
 func (c *DiskChainWriter) Next(id int) (int, error) {
+	if id == 0 {
+		id = len(diskHeader)
+	}
+
 	rr := disk.NewRecordReader(c.file, int64(id), linkListItemSize)
 	next, err := rr.Next()
 	if err == io.EOF {
