@@ -1,3 +1,4 @@
+// markov-walk reads a Markov chain from disk and outputs items proportionally.
 package main
 
 import (

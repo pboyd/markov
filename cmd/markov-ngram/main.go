@@ -1,3 +1,7 @@
+// markov-ngram builds a Markov chain from a text file by splitting it into
+// N-grams (words, bigrams, trigrams, etc.)
+//
+// It is included as an example, not as a useful program.
 package main
 
 import (
@@ -21,8 +25,8 @@ var (
 
 func init() {
 	flag.StringVar(&output, "chain", "", "path the the output chain file")
-	flag.BoolVar(&update, "update", false, "if set update the output file instead of overwriting it")
-	flag.BoolVar(&onDisk, "disk", false, "if set write the chain directly to disk")
+	flag.BoolVar(&update, "update", false, "update the output file instead of overwriting it")
+	flag.BoolVar(&onDisk, "disk", false, "write the chain directly to disk")
 	flag.IntVar(&n, "n", 1, "ngram size")
 	flag.Parse()
 }
