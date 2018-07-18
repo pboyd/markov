@@ -87,7 +87,7 @@ func ReadRecord(file *os.File, offset int64, listElementSize uint16) (*Record, e
 }
 
 func (r *Record) Write() error {
-	offset, err := Write(r.file, r.Offset, r.buf)
+	offset, err := writeAt(r.file, r.Offset, r.buf)
 	if err != nil {
 		return err
 	}

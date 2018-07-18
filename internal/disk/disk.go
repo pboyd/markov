@@ -43,11 +43,11 @@ func sectionHeader(buf []byte) (t sectionType, len uint32) {
 	return
 }
 
-// Write writes the buffer to the file at the given offset.
+// writeAt writes the buffer to the file at the given offset.
 //
 // A negative offset starts from the end of the file. -1 is the very end, -2 is
 // the byte before and so forth.
-func Write(w *os.File, offset int64, buf []byte) (int64, error) {
+func writeAt(w *os.File, offset int64, buf []byte) (int64, error) {
 	var newOff int64
 	var err error
 

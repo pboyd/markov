@@ -325,7 +325,7 @@ func (b *listBucket) Flush(f *os.File) error {
 		return nil
 	}
 
-	offset, err := Write(f, b.offset, b.buf)
+	offset, err := writeAt(f, b.offset, b.buf)
 	if err != nil {
 		return err
 	}
