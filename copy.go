@@ -2,13 +2,15 @@ package markov
 
 import "math"
 
+// CopyFrom is optionally implemented by a WriteChain to improve performance
+// over the generic Copy implementation.
 type CopyFrom interface {
 	CopyFrom(src Chain) error
 }
 
 // Copy copies src to dest.
 //
-// If dest implements CopyFrom it will be used.
+// If the destination supports CopyFrom, it will be used.
 func Copy(dest WriteChain, src Chain) error {
 	if cf, ok := dest.(CopyFrom); ok {
 		return cf.CopyFrom(src)

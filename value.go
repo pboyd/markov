@@ -48,8 +48,6 @@ func marshalValue(value interface{}) ([]byte, error) {
 	default:
 		return nil, fmt.Errorf("unsupported type: %T", v)
 	}
-
-	return nil, nil
 }
 
 func unmarshalValue(buf []byte) (interface{}, error) {
@@ -101,8 +99,6 @@ func unmarshalValue(buf []byte) (interface{}, error) {
 	default:
 		return nil, fmt.Errorf("unsupported type id %d", buf[0])
 	}
-
-	return nil, nil
 }
 
 func marshalString(s string) ([]byte, error) {

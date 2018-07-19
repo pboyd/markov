@@ -41,7 +41,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	fh, err := os.OpenFile(source, os.O_RDWR, 0)
+	fh, err := os.Open(source)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "file error (%s): %v\n", source, err)
 		os.Exit(1)

@@ -4,6 +4,7 @@ import "sync"
 
 var _ Chain = &MemoryChain{}
 
+// MemoryChain is a ReadWriteChain kept in memory.
 type MemoryChain struct {
 	mu         sync.RWMutex
 	valueIndex map[interface{}]int
@@ -11,14 +12,19 @@ type MemoryChain struct {
 	links      []linkCountSlice
 }
 
-func NewMemoryChain(cap int) *MemoryChain {
+// NewMemoryChain creates a new MemoryChain.
+//
+// capacity is the number of items to initially allocate space for. If capacity
+// is unknown, set it to 0.
+func NewMemoryChain(capacity int) *MemoryChain {
 	return &MemoryChain{
-		valueIndex: make(map[interface{}]int, cap),
-		values:     make([]interface{}, 0, cap),
-		links:      make([]linkCountSlice, 0, cap),
+		valueIndex: make(map[interface{}]int, capacity),
+		values:     make([]interface{}, 0, capacity),
+		links:      make([]linkCountSlice, 0, capacity),
 	}
 }
 
+// Get returns a value by it's ID.
 func (c *MemoryChain) Get(id int) (interface{}, error) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
@@ -30,6 +36,9 @@ func (c *MemoryChain) Get(id int) (interface{}, error) {
 	return c.values[id], nil
 }
 
+// Links returns the items linked to the given item.
+//
+// Returns ErrNotFound if the ID doesn't exist.
 func (c *MemoryChain) Links(id int) ([]Link, error) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
@@ -41,6 +50,9 @@ func (c *MemoryChain) Links(id int) ([]Link, error) {
 	return c.links[id].LinkSlice(), nil
 }
 
+// Find returns the ID for the given value.
+//
+// Returns ErrNotFound if the value doesn't exist.
 func (c *MemoryChain) Find(value interface{}) (int, error) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
@@ -54,6 +66,9 @@ func (c *MemoryChain) Find(value interface{}) (int, error) {
 	return id, nil
 }
 
+// Add conditionally inserts a new value to the chain.
+//
+// If the value exists it's ID is returned.
 func (c *MemoryChain) Add(value interface{}) (int, error) {
 	existing, err := c.Find(value)
 	if err == nil {
@@ -76,6 +91,7 @@ func (c *MemoryChain) Add(value interface{}) (int, error) {
 	return id, nil
 }
 
+// Relate increases the number of times child occurs after parent.
 func (c *MemoryChain) Relate(parent, child int, delta int) error {
 	childIndex := c.links[parent].Find(child)
 	if childIndex < 0 {
@@ -88,6 +104,8 @@ func (c *MemoryChain) Relate(parent, child int, delta int) error {
 	return nil
 }
 
+// Next returns the id after the given id. Satifies the IterativeChain
+// interface.
 func (c *MemoryChain) Next(last int) (int, error) {
 	c.mu.RLock()
 	length := len(c.values)

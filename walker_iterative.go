@@ -20,6 +20,9 @@ type iterativeWalker struct {
 	next  int
 }
 
+// IterativeWalker returns a Walker that traverses every item in the Chain.
+//
+// If the chain implements IterativeChain, it will be used.
 func IterativeWalker(chain Chain) Walker {
 	if iw, ok := chain.(IterativeChain); ok {
 		return &iterativeChainWalker{

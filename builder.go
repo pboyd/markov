@@ -63,6 +63,4 @@ func feedOne(cancel chan struct{}, wc WriteChain, values <-chan interface{}) err
 			last = next
 		}
 	}
-
-	return nil
 }

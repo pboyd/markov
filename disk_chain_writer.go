@@ -21,7 +21,14 @@ const (
 	linkListItemsPerBucket = 128
 )
 
-// DiskChainWriter is a ReadWriteChain stored in a file.
+// DiskChainWriter is a ReadWriteChain implementation for file-based chains.
+//
+// The chain operates on-disk as much as possible, which makes it much slower
+// than an in-memory chain. Building a disk chain by feeding values is
+// particularly inefficient (but possible, and sometimes necessary). Building a
+// MemoryChain and copying to a DiskChainWriter is likely faster.
+//
+// Values can be strings, runes or any builtin numeric type.
 type DiskChainWriter struct {
 	file           *os.File
 	fileWriteMutex sync.Mutex
@@ -79,6 +86,7 @@ func verifyDiskHeader(file *os.File) error {
 	return nil
 }
 
+// Get returns a value by it's ID.
 func (c *DiskChainWriter) Get(id int) (interface{}, error) {
 	if id == 0 {
 		id = len(diskHeader)
@@ -92,6 +100,9 @@ func (c *DiskChainWriter) Get(id int) (interface{}, error) {
 	return unmarshalValue(record.Value())
 }
 
+// Links returns the items linked to the given item.
+//
+// Returns ErrNotFound if the ID doesn't exist.
 func (c *DiskChainWriter) Links(id int) ([]Link, error) {
 	if id == 0 {
 		id = len(diskHeader)
@@ -127,6 +138,9 @@ func (c *DiskChainWriter) Links(id int) ([]Link, error) {
 	return links, nil
 }
 
+// Find returns the ID for the given value.
+//
+// Returns ErrNotFound if the value doesn't exist.
 func (c *DiskChainWriter) Find(value interface{}) (int, error) {
 	c.indexMutex.RLock()
 	defer c.indexMutex.RUnlock()
@@ -139,6 +153,9 @@ func (c *DiskChainWriter) Find(value interface{}) (int, error) {
 	return int(id), nil
 }
 
+// Add conditionally inserts a new value to the chain.
+//
+// If the value exists it's ID is returned.
 func (c *DiskChainWriter) Add(value interface{}) (int, error) {
 	return c.add(value, linkListItemsPerBucket)
 }
@@ -170,6 +187,7 @@ func (c *DiskChainWriter) add(value interface{}, bucketSize uint16) (int, error)
 	return int(record.Offset), err
 }
 
+// Relate increases the number of times child occurs after parent.
 func (c *DiskChainWriter) Relate(parent, child int, delta int) error {
 	record, err := disk.ReadRecord(c.file, int64(parent), linkListItemSize)
 	if err != nil {
@@ -246,7 +264,7 @@ func (c *DiskChainWriter) packLinkValue(id int, count uint32) []byte {
 	return buf
 }
 
-func (_ *DiskChainWriter) updateLinkCount(buf []byte, count uint32) {
+func (c *DiskChainWriter) updateLinkCount(buf []byte, count uint32) {
 	binary.BigEndian.PutUint32(buf[8:], count)
 }
 
@@ -274,6 +292,8 @@ func (c *DiskChainWriter) buildIndex() error {
 	}
 }
 
+// Next returns the id after the given id. Satifies the IterativeChain
+// interface.
 func (c *DiskChainWriter) Next(id int) (int, error) {
 	if id == 0 {
 		id = len(diskHeader)
@@ -292,7 +312,9 @@ func (c *DiskChainWriter) Next(id int) (int, error) {
 	return int(next), nil
 }
 
-func (dest *DiskChainWriter) CopyFrom(src Chain) error {
+// CopyFrom satifies the CopyFrom interface. It's faster than the generic Copy
+// algorithm implemented by Copy.
+func (c *DiskChainWriter) CopyFrom(src Chain) error {
 	valueToDestID := make(map[interface{}]int)
 	srcIDtoDestID := make(map[int]int)
 
@@ -317,7 +339,7 @@ func (dest *DiskChainWriter) CopyFrom(src Chain) error {
 			return err
 		}
 
-		destID, err := dest.add(value, uint16(len(links)))
+		destID, err := c.add(value, uint16(len(links)))
 		if err != nil {
 			return err
 		}
@@ -337,13 +359,13 @@ func (dest *DiskChainWriter) CopyFrom(src Chain) error {
 			return err
 		}
 
-		record, err := disk.ReadRecord(dest.file, int64(destID), linkListItemSize)
+		record, err := disk.ReadRecord(c.file, int64(destID), linkListItemSize)
 		if err != nil {
 			return err
 		}
 
 		for _, link := range linkCounts {
-			err = dest.relateToRecord(record, srcIDtoDestID[link.ID], link.Count)
+			err = c.relateToRecord(record, srcIDtoDestID[link.ID], link.Count)
 			if err != nil {
 				return err
 			}

@@ -9,6 +9,8 @@ type randomWalker struct {
 	last  int
 }
 
+// RandomWalker traverses a chain. Items are chosen randomly, but each
+// possible item is weighted by it's probability.
 func RandomWalker(chain Chain, startID int) Walker {
 	return &randomWalker{
 		chain: chain,
