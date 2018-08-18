@@ -104,7 +104,7 @@ func (c *MemoryChain) Relate(parent, child int, delta int) error {
 	return nil
 }
 
-// Next returns the id after the given id. Satifies the IterativeChain
+// Next returns the id after the given id. Satisfies the IterativeChain
 // interface.
 func (c *MemoryChain) Next(last int) (int, error) {
 	c.mu.RLock()

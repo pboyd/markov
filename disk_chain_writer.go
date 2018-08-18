@@ -292,7 +292,7 @@ func (c *DiskChainWriter) buildIndex() error {
 	}
 }
 
-// Next returns the id after the given id. Satifies the IterativeChain
+// Next returns the id after the given id. Satisfies the IterativeChain
 // interface.
 func (c *DiskChainWriter) Next(id int) (int, error) {
 	if id == 0 {
@@ -312,7 +312,7 @@ func (c *DiskChainWriter) Next(id int) (int, error) {
 	return int(next), nil
 }
 
-// CopyFrom satifies the CopyFrom interface. It's faster than the generic Copy
+// CopyFrom satisfies the CopyFrom interface. It's faster than the generic Copy
 // algorithm implemented by Copy.
 func (c *DiskChainWriter) CopyFrom(src Chain) error {
 	valueToDestID := make(map[interface{}]int)

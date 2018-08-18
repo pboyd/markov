@@ -41,7 +41,7 @@ func (c *DiskChain) Find(value interface{}) (id int, err error) {
 	return c.w.Find(value)
 }
 
-// Next returns the id after the given id. Satifies the IterativeChain
+// Next returns the id after the given id. Satisfies the IterativeChain
 // interface.
 func (c *DiskChain) Next(id int) (int, error) {
 	return c.w.Next(id)
