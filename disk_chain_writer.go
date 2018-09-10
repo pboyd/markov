@@ -86,7 +86,7 @@ func verifyDiskHeader(file *os.File) error {
 	return nil
 }
 
-// Get returns a value by it's ID.
+// Get returns a value by it's ID. Returns nil if the ID doesn't exist.
 func (c *DiskChainWriter) Get(id int) (interface{}, error) {
 	if id == 0 {
 		id = len(diskHeader)

@@ -22,7 +22,7 @@ func ReadDiskChain(fh *os.File) (*DiskChain, error) {
 	}, nil
 }
 
-// Get returns a value by it's ID.
+// Get returns a value by it's ID. Returns nil if the ID doesn't exist.
 func (c *DiskChain) Get(id int) (interface{}, error) {
 	return c.w.Get(id)
 }

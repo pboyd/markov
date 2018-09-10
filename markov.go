@@ -12,7 +12,7 @@ var (
 
 // Chain is a read-only Markov chain.
 type Chain interface {
-	// Get returns a value by it's ID.
+	// Get returns a value by it's ID. Returns nil if the ID doesn't exist.
 	Get(id int) (interface{}, error)
 
 	// Links returns the items linked to the given item.

@@ -24,7 +24,7 @@ func NewMemoryChain(capacity int) *MemoryChain {
 	}
 }
 
-// Get returns a value by it's ID.
+// Get returns a value by it's ID. Returns nil if the ID doesn't exist.
 func (c *MemoryChain) Get(id int) (interface{}, error) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
