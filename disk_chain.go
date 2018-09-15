@@ -46,3 +46,9 @@ func (c *DiskChain) Find(value interface{}) (id int, err error) {
 func (c *DiskChain) Next(id int) (int, error) {
 	return c.w.Next(id)
 }
+
+// Random pseudo-randomly picks a value and returns it. Satisfies the
+// RandomChain interface.
+func (c *DiskChain) Random() (interface{}, error) {
+	return c.w.Random()
+}

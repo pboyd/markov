@@ -379,3 +379,16 @@ func (c *DiskChainWriter) CopyFrom(src Chain) error {
 
 	return nil
 }
+
+// Random pseudo-randomly picks a value and returns it. Satisfies the
+// RandomChain interface.
+func (c *DiskChainWriter) Random() (interface{}, error) {
+	c.indexMutex.RLock()
+	defer c.indexMutex.RUnlock()
+
+	for v := range c.index {
+		return v, nil
+	}
+
+	return nil, nil
+}

@@ -1,6 +1,9 @@
 package markov
 
-import "sync"
+import (
+	"math/rand"
+	"sync"
+)
 
 var _ Chain = &MemoryChain{}
 
@@ -115,6 +118,16 @@ func (c *MemoryChain) Next(last int) (int, error) {
 		return 0, ErrBrokenChain
 	}
 	return last + 1, nil
+}
+
+// Random pseudo-randomly picks a value and returns it. Satisfies the
+// RandomChain interface.
+func (c *MemoryChain) Random() (interface{}, error) {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	i := rand.Intn(len(c.values))
+	return c.values[i], nil
 }
 
 func (c *MemoryChain) linkCounts(id int) (linkCountSlice, error) {
