@@ -1,8 +1,8 @@
 # Markov [![GoDoc](https://godoc.org/github.com/golang/gddo?status.svg)](https://godoc.org/github.com/pboyd/markov)
 
-`markov` is a Markov chain implementation in Go.
-
-It supports in-memory and disk based Markov chains.
+`markov` is a Markov chain for Go. The package contains a in-memory chain and a
+slower disk-based version, and functions to move between the memory and disk
+versions.
 
 ## Example
 
@@ -13,7 +13,6 @@ package main
 
 import (
 	"fmt"
-	"math/rand"
 
 	"github.com/pboyd/markov"
 )
@@ -37,6 +36,8 @@ func main() {
 			break
 		}
 	}
+
+        fmt.Print("\n")
 }
 
 func split(text string) chan interface{} {
@@ -59,4 +60,4 @@ For more in-depth examples see the `cmd/markov-ngram` and `cmd/markov-walk` prog
 
 # License
 
-This package is release under the terms of the Apache 2.0 license. See LICENSE.TXT.
+This package is released under the terms of the Apache 2.0 license. See LICENSE.TXT.
